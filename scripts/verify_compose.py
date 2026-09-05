@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser(description="Czysta demonstracja Compose na odrębnych wolumenach.")
     parser.add_argument("--port", type=int, default=5174)
+    parser.add_argument("--local-imap", action="store_true", help="Jawnie dołącz uruchomiony lokalny Dovecot testowy.")
     args = parser.parse_args()
     if not 1024 <= args.port <= 65535:
         parser.error("Port musi należeć do zakresu 1024–65535.")
@@ -37,16 +38,25 @@ def main():
     env = {**os.environ, "BROKER_ENV_FILE": str(configuration), "BROKER_HTTP_PORT": str(args.port)}
     command = ["docker", "compose", "--project-name", project, "--env-file", str(configuration),
                "--file", str(ROOT / "compose.yaml")]
+    if args.local_imap:
+        if not (ROOT / ".local/imap-test/local.json").is_file():
+            parser.error("Najpierw wykonaj scripts/local_imap.py init oraz start.")
+        command.extend(["--file", str(ROOT / "compose.local-imap.yaml")])
     username = "compose.demo"
     password = secrets.token_urlsafe(32)
+    credentials = {"username": username, "password": password, "second_username": "compose.second",
+                   "second_password": secrets.token_urlsafe(32), "admin_username": "compose.admin",
+                   "admin_password": secrets.token_urlsafe(32)}
     if os.environ.get("GITHUB_ACTIONS") == "true":
-        print("::add-mask::" + password, flush=True)
+        for key in ("password", "second_password", "admin_password"):
+            print("::add-mask::" + credentials[key], flush=True)
     credentials_path = directory / "credentials.json"
     descriptor = os.open(credentials_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "w") as stream:
-        json.dump({"username": username, "password": password}, stream)
+        json.dump(credentials, stream)
     metadata = {"project": project, "port": args.port, "environment_file": str(configuration),
-                "credentials_file": str(credentials_path), "data": "DANE TESTOWE", "completed": False}
+                "credentials_file": str(credentials_path), "data": "DANE TESTOWE", "completed": False,
+                "local_imap": args.local_imap}
     (directory / "result.json").write_text(json.dumps(metadata, indent=2) + "\n")
 
     def run(*arguments, **kwargs):
@@ -58,8 +68,10 @@ def main():
         run("run", "--rm", "backend", "python", "manage.py", "migrate", "--noinput")
         run("run", "--rm", "backend", "python", "manage.py", "makemigrations", "--check", "--dry-run")
         run("run", "--rm", "backend", "python", "/app/scripts/check_ocr.py")
-        run("run", "--rm", "-T", "backend", "python", "manage.py", "seed_demo", "--username", username,
-            "--role", "ADMIN", "--password-stdin", "--without-documents", input=password + "\n", text=True)
+        for prefix, role in (("", "EMPLOYEE"), ("second_", "EMPLOYEE"), ("admin_", "ADMIN")):
+            run("run", "--rm", "-T", "backend", "python", "manage.py", "seed_demo", "--username",
+                credentials[prefix + "username"], "--role", role, "--password-stdin", "--without-documents",
+                input=credentials[prefix + "password"] + "\n", text=True)
         run("up", "-d", "--wait")
         for _ in range(30):
             try:

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useId, useRef } from 'react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { Link, useBeforeUnload, useBlocker } from 'react-router-dom';
 import {
@@ -360,6 +360,7 @@ export function Modal({
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     const element = ref.current;
     element?.showModal();
@@ -368,6 +369,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
+      aria-labelledby={titleId}
       className="modal"
       onCancel={(event) => {
         event.preventDefault();
@@ -375,7 +377,7 @@ export function Modal({
       }}
     >
       <div className="modal-heading">
-        <h2>{title}</h2>
+        <h2 id={titleId}>{title}</h2>
         <Button variant="ghost" onClick={onClose} aria-label="Zamknij">
           <X size={20} />
         </Button>

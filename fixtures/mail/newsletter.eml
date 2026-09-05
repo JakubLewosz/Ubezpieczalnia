@@ -1,0 +1,12 @@
+X-Broker-Demo: DANE TESTOWE
+From: Anna Demonstracyjna <newsletter@example.invalid>
+To: kancelaria@example.invalid
+Subject: DANE TESTOWE =?utf-8?b?4oCUIE5ld3NsZXR0ZXIg4oCU?= informacje testowe
+Date: Sat, 05 Sep 2026 12:00:00 +0200
+Message-ID: <newsletter@broker.example.invalid>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+MIME-Version: 1.0
+
+DANE TESTOWE
+Proszę o sprawdzenie wiadomości.

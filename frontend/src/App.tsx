@@ -7,6 +7,7 @@ import {
   FileCheck2,
   Files,
   LayoutGrid,
+  Inbox,
   LogOut,
   Menu,
   Search,
@@ -41,10 +42,13 @@ export function AppLayout() {
       ? 'Dokumenty'
       : location.pathname.startsWith('/policies')
         ? 'Polisy'
-        : 'Start';
+        : location.pathname.startsWith('/mailbox')
+          ? 'Skrzynka'
+          : 'Start';
   const displayName = `${user.first_name} ${user.last_name}`.trim() || user.username;
   const links = [
     { to: '/', label: 'Start', icon: LayoutGrid },
+    { to: '/mailbox', label: 'Skrzynka', icon: Inbox },
     { to: '/clients', label: 'Klienci', icon: Users },
     { to: '/documents', label: 'Dokumenty', icon: Files },
     { to: '/policies', label: 'Polisy', icon: ShieldCheck },
@@ -198,7 +202,21 @@ export function DashboardPage() {
         <Loading />
       ) : (
         <>
-          <div className="stats-grid">
+          <div className="stats-grid mail-dashboard-grid">
+            <Link className="stat-card" to="/mailbox?queue=action">
+              <span className="stat-label">
+                Do obsłużenia
+                <Inbox size={20} />
+              </span>
+              <div className="stat-number">
+                {resource.data.mail_action_count ?? '—'}
+                <span>wiadomości</span>
+              </div>
+              <span className="stat-footer amber-text">
+                Przeczytanie nie zamyka obsługi
+                <ArrowUpRight size={15} />
+              </span>
+            </Link>
             <Link className="stat-card" to="/documents">
               <span className="stat-label">
                 Do sprawdzenia
@@ -240,6 +258,14 @@ export function DashboardPage() {
                 Wspólna baza kancelarii
                 <ArrowUpRight size={15} />
               </span>
+            </Link>
+          </div>
+          <div className="mail-dashboard-links">
+            <Link to="/mailbox?queue=unassigned">
+              Nieprzydzielone wiadomości: {resource.data.mail_unassigned_count ?? '—'}
+            </Link>
+            <Link to="/mailbox?queue=mine">
+              Moje wiadomości: {resource.data.mail_mine_count ?? '—'}
             </Link>
           </div>
           {resource.data.failed_count > 0 && (

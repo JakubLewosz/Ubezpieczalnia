@@ -10,11 +10,13 @@ class DocumentSerializer(serializers.ModelSerializer):
     duplicate_warnings = serializers.SerializerMethodField()
     latest_job = serializers.SerializerMethodField()
     review_status = serializers.SerializerMethodField()
+    mail_source = serializers.SerializerMethodField()
 
     class Meta:
         model = Document
         fields = [
             "id",
+            "mail_source",
             "client",
             "client_name",
             "policy",
@@ -83,3 +85,8 @@ class DocumentSerializer(serializers.ModelSerializer):
         if result and not result.profile:
             return "unsupported"
         return "pending"
+
+    def get_mail_source(self, obj):
+        from correspondence.models import Attachment
+        source = Attachment.objects.filter(document=obj).first()
+        return {"message": source.message_id, "attachment": source.pk, "part_key": source.part_key} if source else None

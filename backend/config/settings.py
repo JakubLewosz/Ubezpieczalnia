@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "policies",
     "extraction",
     "exports",
+    "correspondence",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -85,6 +86,29 @@ MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(20 * 1024 * 1024)))
 MAX_DOCUMENT_PAGES = int(os.getenv("MAX_DOCUMENT_PAGES", "30"))
 MAX_DOCUMENT_PIXELS = int(os.getenv("MAX_DOCUMENT_PIXELS", "40000000"))
 MAX_UNPACKED_BYTES = 100 * 1024 * 1024
+MAIL_CONFIGURATION_ERRORS = []
+
+
+def mail_integer(name, default, minimum, maximum):
+    """A broken mail setting must not prevent the rest of Django from starting."""
+    try:
+        value = int(os.getenv(name, str(default)))
+        if minimum <= value <= maximum:
+            return value
+    except (TypeError, ValueError):
+        pass
+    MAIL_CONFIGURATION_ERRORS.append(name)
+    return default
+
+
+MAIL_MAX_RAW_BYTES = mail_integer("MAIL_MAX_RAW_BYTES", 30 * 1024 * 1024, 1024, 30 * 1024 * 1024)
+MAIL_MAX_HEADER_BYTES = mail_integer("MAIL_MAX_HEADER_BYTES", 128 * 1024, 1024, 1024 * 1024)
+MAIL_MAX_PARTS = mail_integer("MAIL_MAX_PARTS", 100, 1, 1000)
+MAIL_MAX_DEPTH = mail_integer("MAIL_MAX_DEPTH", 10, 1, 30)
+MAIL_MAX_ATTACHMENTS = mail_integer("MAIL_MAX_ATTACHMENTS", 30, 1, 100)
+MAIL_MAX_ATTACHMENT_BYTES = mail_integer("MAIL_MAX_ATTACHMENT_BYTES", MAX_UPLOAD_BYTES, 1, MAX_UPLOAD_BYTES)
+MAIL_MAX_DECODED_BYTES = mail_integer("MAIL_MAX_DECODED_BYTES", 30 * 1024 * 1024, 1024, 100 * 1024 * 1024)
+MAIL_MAX_BODY_BYTES = mail_integer("MAIL_MAX_BODY_BYTES", 2 * 1024 * 1024, 1024, 10 * 1024 * 1024)
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SECURE = not DEVELOPMENT
@@ -119,7 +143,20 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": 360}
 CELERY_TASK_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_TASK_DEFAULT_QUEUE = "maintenance"
+CELERY_TASK_ROUTES = {
+    "extraction.tasks.process_document": {"queue": "ocr"},
+    "extraction.tasks.recover_stale_jobs": {"queue": "maintenance"},
+    "correspondence.tasks.sync_mailbox": {"queue": "mail"},
+    "correspondence.tasks.poll_mailboxes": {"queue": "maintenance"},
+    "correspondence.tasks.cleanup_mail_files": {"queue": "maintenance"},
+}
 OCR_LANGUAGE = "pol+eng"
 CELERY_BEAT_SCHEDULE = {
-    "recover-stale-extraction": {"task": "extraction.tasks.recover_stale_jobs", "schedule": 60.0}
+    "recover-stale-extraction": {"task": "extraction.tasks.recover_stale_jobs", "schedule": 60.0},
+    "poll-mailboxes": {
+        "task": "correspondence.tasks.poll_mailboxes",
+        "schedule": mail_integer("MAIL_POLL_SECONDS", 60, 15, 3600),
+    },
+    "cleanup-mail-files": {"task": "correspondence.tasks.cleanup_mail_files", "schedule": 60.0},
 }

@@ -1,0 +1,33 @@
+# Explicitly opt into the synthetic local Dovecot source; never used by default.
+x-local-imap: &local-imap
+  environment:
+    MAIL_SYNC_ENABLED: "true"
+    MAIL_HOST: imap-test
+    MAIL_PORT: "31993"
+    MAIL_USERNAME: shared@example.invalid
+    MAIL_PASSWORD_FILE: /run/broker-imap/password
+    MAIL_CA_FILE: /run/broker-imap/tls.crt
+    MAIL_FOLDER: INBOX
+    MAIL_POLL_SECONDS: "15"
+  volumes:
+    - local_imap_client:/run/broker-imap:ro
+  networks: [default, local_imap]
+
+services:
+  backend:
+    <<: *local-imap
+  worker:
+    <<: *local-imap
+  mail-worker:
+    <<: *local-imap
+  beat:
+    <<: *local-imap
+
+networks:
+  local_imap:
+    external: true
+    name: broker-imap-test_default
+volumes:
+  local_imap_client:
+    external: true
+    name: broker-imap-test_client_config

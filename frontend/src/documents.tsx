@@ -548,6 +548,12 @@ export function ReviewWorkspace({
           Odczyt lokalny
         </span>
       </div>
+      {document.mail_source && (
+        <Alert kind="info">
+          Dokument pochodzi z załącznika wiadomości w skrzynce.{' '}
+          <Link to={`/mailbox/${document.mail_source.message}`}>Wróć do obsługi wiadomości</Link>
+        </Alert>
+      )}
       <Warnings items={document.duplicate_warnings} />
       {networkError && <ErrorNotice error={networkError} onReload={refresh} />}
       <Warnings items={review.engine_result?.warnings} />

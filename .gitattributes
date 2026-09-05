@@ -4,3 +4,5 @@
 *.jpg binary
 *.jpeg binary
 *.ttf binary
+# Preserve exact RFC 5322 fixture bytes across clones and operating systems.
+fixtures/mail/*.eml binary

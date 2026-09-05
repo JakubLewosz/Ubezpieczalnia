@@ -2,7 +2,7 @@
 
 Lokalne MVP do demonstracji obsługi kancelarii ubezpieczeniowej. **Wyłącznie DANE TESTOWE.** Nie jest wdrożeniem produkcyjnym ani deklaracją zgodności z RODO.
 
-Przebieg: logowanie → klient → prywatny dokument → lokalny odczyt tekstu/OCR → ręczna weryfikacja obok stron dokumentu → zatwierdzona rewizja → kontrolny XLSX. Dodatkowo kartoteki, ręczne polisy z wieloma uczestnikami, terminy i historia operacji. Zakres wykonanych testów i bieżące ograniczenia opisuje [STATUS](docs/STATUS.md).
+Przebieg: logowanie → klient → prywatny dokument → lokalny odczyt tekstu/OCR → ręczna weryfikacja obok stron dokumentu → zatwierdzona rewizja → kontrolny XLSX. Dodatkowo kartoteki, ręczne polisy z wieloma uczestnikami, terminy, historia i wspólna skrzynka przychodząca. Każdy nowy mail jest osobną pozycją do obsługi; otwarcie wiadomości jej nie zamyka. Zakres wykonanych testów i bieżące ograniczenia opisuje [STATUS](docs/STATUS.md).
 
 Technologia: modularny monolit Django 5.2/DRF/PostgreSQL 17, React/TypeScript strict/Vite/Tailwind, Celery/Redis, pypdf/pypdfium2/Tesseract `pol+eng`, openpyxl. Interfejs i API działają pod jednym originem. Pierwszy profil odczytu dotyczy wyłącznie wniosków brokerskich komunikacyjnych.
 
@@ -24,7 +24,7 @@ Hasła podajesz interaktywnie, minimum 12 znaków. Nie ma domyślnego hasła. Se
 
 Otwórz [Broker Office lokalnie](http://127.0.0.1:5173). Korzystaj stale z tego samego hosta, nie przełączaj `localhost` i `127.0.0.1` w trakcie sesji. Compose publikuje tylko port aplikacji na adresie pętli zwrotnej. PostgreSQL, Redis i magazyn plików są dostępne wewnątrz sieci Compose.
 
-Zatrzymanie: `docker compose down`. Ponowne uruchomienie: `docker compose up -d`. Dane pozostają na wolumenach `database`, `private_media`, `queue`. **`docker compose down -v` usuwa te dane.** Diagnostyka: `docker compose ps`, `docker compose logs --tail=80 backend worker beat`.
+Zatrzymanie: `docker compose down`. Ponowne uruchomienie: `docker compose up -d`. Dane pozostają na wolumenach `database`, `private_media`, `queue`. **`docker compose down -v` usuwa te dane.** Diagnostyka: `docker compose ps`, `docker compose logs --tail=80 backend worker mail-worker beat`.
 
 ## Windows / PowerShell
 
@@ -40,7 +40,7 @@ Bez Dockera użyj WSL2 (Ubuntu) i instrukcji Linux poniżej. Natywny proces Cele
 
 ## Bez demona Docker: macOS / Linux / Codex
 
-Wymagania: Python 3.12 zarządzany przez `uv`, Node.js 22.12+ (lub wspierane nowsze LTS), PostgreSQL 17, Redis 8 i Tesseract z polskim/angielskim. Repozytorium zawiera lockfile Python i npm; do instalacji używaj trybu zamrożonego.
+Wymagania: Python 3.12 zarządzany przez `uv`, Node.js 22.23.2 / npm 10.9.8 (wersje odtworzone w CI i obrazach), PostgreSQL 17, Redis 8 i Tesseract z polskim/angielskim. Repozytorium zawiera lockfile Python i npm; do instalacji używaj trybu zamrożonego.
 
 macOS z Homebrew:
 
@@ -74,19 +74,34 @@ uv run --project backend python scripts/dev.py
 
 Skrypt sprawdza PID, katalog danych i pidfile Redis przed użyciem lub zatrzymaniem instancji. Przy konflikcie z innym klonem zgłasza błąd; nie zatrzymuje obcej usługi. Zmienne jawnie ustawione w terminalu mają pierwszeństwo przed `.env` we wszystkich skryptach uruchomieniowych.
 
-`dev.py` uruchamia Django, Celery worker, Celery beat i Vite. Ctrl+C zatrzymuje aplikację; następnie `uv run --project backend python scripts/local_services.py stop` zatrzymuje bazę i kolejkę. Wznowienie tych samych poleceń zachowuje dane. Limity pamięci Compose nie obowiązują automatycznie przy natywnym uruchomieniu; wykonuj odczyt wyłącznie na syntetycznych dokumentach.
+`dev.py` uruchamia Django, osobny worker OCR, worker mail/maintenance, Celery beat i Vite. Ciężki OCR ma odrębną kolejkę. Ctrl+C zatrzymuje aplikację; następnie `uv run --project backend python scripts/local_services.py stop` zatrzymuje bazę i kolejkę. Wznowienie tych samych poleceń zachowuje dane. Limity pamięci Compose nie obowiązują automatycznie przy natywnym uruchomieniu; wykonuj odczyt wyłącznie na syntetycznych dokumentach.
 
 ## Demonstracja
 
 1. Zaloguj się utworzonym kontem; dodaj klienta lub otwórz Alicję z oznaczeniem DANE TESTOWE.
-2. Wgraj `fixtures/synthetic/application_text.pdf` przy kliencie. Dokument zapisze się na dysku i w PostgreSQL.
+2. Wgraj `fixtures/remediation/numbered.pdf` przy kliencie. Dokument zapisze się na dysku i w PostgreSQL.
 3. Uruchom odczyt i poczekaj na zakończenie zadania. Otwórz weryfikację, przejdź do źródła wybranego pola, zmień wartość i zapisz szkic.
-4. Zatwierdź rewizję; pobierz „Eksport kontrolny — układ demonstracyjny, do uzgodnienia”. Sprawdź arkusze Informacje i Dane.
+4. W razie braków dodaj uczestnika lub zakres; zapisz, przejrzyj bieżące ostrzeżenia i jawnie je potwierdź. Istotna sprzeczność wymaga notatki. Zatwierdź rewizję; pobierz „Eksport kontrolny — układ demonstracyjny, do uzgodnienia”. Sprawdź arkusze Informacje i Dane.
 5. Powtórz z `application_scan.pdf` oraz `application_mixed.pdf`. Odczyt OCR może pozostawić niejednoznaczne kontakty puste; popraw je na podstawie widocznego dokumentu.
 6. Wgraj `unsupported_property.pdf`: oczekiwany komunikat „Brak profilu automatycznego odczytu”. Dokument nadal można pobrać.
 7. Otwórz polisę testową z kilkoma uczestnikami i listę kończących się polis. Filtry 7/30/60 dni są ustawieniami demonstracyjnymi.
 
 Generator dokumentów: `uv run --project backend python scripts/generate_fixtures.py`. Wzorce oczekiwane są osobno w `fixtures/synthetic/expected.json`; silnik ich nie czyta.
+
+
+## Demonstracja skrzynki
+
+Po powyższej instalacji/migracji, przy działającej aplikacji:
+
+```sh
+uv run --project backend python backend/manage.py seed_mail --all
+# Kolejny mail jest świadomą czynnością, także gdy aplikacja pozostaje otwarta:
+uv run --project backend python backend/manage.py seed_mail --fixture application
+```
+
+W Compose: `docker compose run --rm backend python manage.py seed_mail --all`. Otwórz „Skrzynka”, przejmij wiadomość z wnioskiem, wybierz klienta, zapisz załącznik w jego dokumentach i przejdź istniejący odczyt/weryfikację/XLSX. Następnie świadomie zakończ obsługę. `seed_mail --fixture reply` dodaje nową pozycję todo mimo zakończenia poprzedniego tematu. Drugi pracownik ma własny znacznik przeczytania i widzi właściciela pracy.
+
+To działający import offline przez wspólny parser, bez Internetu. Osobno wykonano rzeczywisty odbiór IMAP/TLS na lokalnym Dovecot przez worker. Dokładny start serwera, injector oraz uruchomienie aplikacji z tym źródłem: [LOCAL_IMAP](docs/LOCAL_IMAP.md). Pełne reguły stanów, limity, konfiguracja, odbudowa UIDVALIDITY i przyszły test Interii: [MAILBOX](docs/MAILBOX.md). Zewnętrzna synchronizacja jest domyślnie wyłączona; nie wpisuj hasła kancelarii do rozmowy ani repo.
 
 ## Weryfikacja i dokumentacja
 
@@ -102,4 +117,4 @@ npm run build --prefix frontend
 
 Playwright wymaga działającej aplikacji i jawnie podanych danych konta testowego: [TESTING](docs/TESTING.md). Procedura kopii bazy i plików: [SECURITY](docs/SECURITY.md). Założenia techniczne i biznesowe: [DECISIONS](docs/DECISIONS.md). [API](docs/API.md), [pełna specyfikacja](docs/MVP_SPEC.md), [backlog](docs/BACKLOG.md), [wersje i licencje](docs/LICENSES.md), [zrzuty działającej aplikacji](docs/SCREENSHOTS.md).
 
-Nie ma integracji poczty, zewnętrznego AI, automatycznego wystawiania polis ani docelowego arkusza kancelarii. Nie dodawaj `.env`, uploadów, eksportów ani kopii danych do Git.
+Skrzynka odbiera pocztę tylko do odczytu. Nie ma SMTP/odpowiadania, zewnętrznego AI, automatycznego wystawiania polis ani docelowego arkusza kancelarii. Nie dodawaj `.env`, uploadów, eksportów ani kopii danych do Git.

@@ -222,3 +222,8 @@ Nie czekaj na docelowy Excel, pocztę ani serwer, żeby wykonać opisany zakres 
 Na zakończenie podaj: co rzeczywiście działa, jak uruchomić i przejść demonstrację, jakie testy uruchomiono i z jakim wynikiem, czego nie sprawdzono, znane ograniczenia oraz zalecany następny etap. Podaj branch i commit, jeśli powstały. Nie deklaruj całego MVP jako ukończonego, jeśli brakuje kluczowego przebiegu.
 
 Zacznij od inspekcji repozytorium i krótkiego planu. Następnie implementuj, uruchamiaj, testuj i poprawiaj działającą aplikację.
+
+
+## Implementacja późniejszego zakresu
+
+Wymagania A01–A09 i przychodzącej skrzynki z docs/REMEDIATION_SPEC.md są teraz realizowane w tej samej aplikacji. Aktualny kontrakt: docs/API.md, przejścia i operacje IMAP: docs/MAILBOX.md, wykonane próby: docs/REMEDIATION_STATUS.md. Historyczne wyłączenie poczty powyżej nie jest już bieżącym zakresem. Nadal wyłączone są SMTP, produkcyjne wdrożenie, zewnętrzne AI, automatyczne klient/polisa i pełny import historii.

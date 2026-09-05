@@ -6,6 +6,7 @@ import { AuthProvider } from './auth';
 import { ClientDetailPage, ClientFormPage, ClientsPage } from './clients';
 import { DocumentsPage, ReviewPage, UploadPage } from './documents';
 import { PoliciesPage, PolicyDetailPage, PolicyFormPage } from './policies';
+import { MailboxPage, MessagePage } from './mailbox';
 import './styles.css';
 
 const router = createBrowserRouter([
@@ -26,6 +27,8 @@ const router = createBrowserRouter([
       { path: 'documents', element: <DocumentsPage /> },
       { path: 'documents/new', element: <UploadPage /> },
       { path: 'documents/:id', element: <ReviewPage /> },
+      { path: 'mailbox', element: <MailboxPage /> },
+      { path: 'mailbox/:id', element: <MessagePage /> },
       { path: 'policies', element: <PoliciesPage /> },
       { path: 'policies/new', element: <PolicyFormPage /> },
       { path: 'policies/:id', element: <PolicyDetailPage /> },

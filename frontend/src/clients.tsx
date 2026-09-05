@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { api, date, dateTime, params, patch, post } from './api';
 import { useApi, useDebounce, useMounted } from './hooks';
+import { ClientCorrespondence } from './mailbox';
 import type { AuditEvent, Client, DocumentRecord, Page, Policy } from './types';
 import {
   Alert,
@@ -584,6 +585,7 @@ export function ClientDetailPage() {
           </section>
         </aside>
         <div className="detail-content">
+          <ClientCorrespondence clientId={client.id} />
           <section className="panel">
             <div className="card-heading padded">
               <h2>
@@ -654,12 +656,14 @@ export function ClientPicker({
   onSelect,
   exclude = [],
   label = 'Znajdź klienta',
+  initialSearch = '',
 }: {
   onSelect: (client: Client) => void;
   exclude?: number[];
   label?: string;
+  initialSearch?: string;
 }) {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
   const query = useDebounce(search);
   const exclusions = [...new Set(exclude)].sort((a, b) => a - b).join(',');
   const filterKey = `${query}:${exclusions}`;

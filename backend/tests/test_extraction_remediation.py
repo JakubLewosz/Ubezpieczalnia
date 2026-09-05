@@ -367,3 +367,14 @@ def test_common_participant_label_is_not_a_person_name_in_legacy_labelled_profil
     assert actual["participants.0.role"] == "policyholder,insured"
     assert actual["participants.0.name"] == "Anna Demonstracyjna"
     assert len({f["group_id"] for f in result["fields"] if f["group"] == "participants"}) == 1
+
+
+def test_manual_rescue_draft_is_in_dashboard_review_count(api, customer, user):
+    from documents.models import Document
+    from extraction.models import ReviewDraft
+    document = Document.objects.create(client=customer, author=user, file="synthetic/manual-rescue.pdf", original_name="DANE TESTOWE ratunek.pdf", mime_type="application/pdf", size=1, checksum="0" * 64)
+    ReviewDraft.objects.create(document=document, engine_result=None, profile="broker_motor_application_v1", origin="manual", fields=[])
+    response = api.get("/api/dashboard/")
+    assert response.status_code == 200
+    assert response.data["review_count"] == 1
+    assert response.data["review_documents"][0]["id"] == document.pk

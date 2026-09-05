@@ -59,8 +59,15 @@ services:
     mem_limit: 768m
   worker:
     <<: *backend
-    command: [sh, -c, 'exec celery -A config worker --loglevel=WARNING --concurrency=$${OCR_CONCURRENCY:-1} --prefetch-multiplier=1 --max-tasks-per-child=20']
+    command: [sh, -c, 'exec celery -A config worker --hostname=ocr@%h --queues=ocr,celery --loglevel=WARNING --concurrency=$${OCR_CONCURRENCY:-1} --prefetch-multiplier=1 --max-tasks-per-child=20']
     mem_limit: 1536m
+    cpus: 1.0
+    pids_limit: 96
+    stop_grace_period: 45s
+  mail-worker:
+    <<: *backend
+    command: [celery, -A, config, worker, "--hostname=mail@%h", "--queues=mail,maintenance", --loglevel=WARNING, --concurrency=1, --prefetch-multiplier=1, --max-tasks-per-child=100]
+    mem_limit: 512m
     cpus: 1.0
     pids_limit: 96
     stop_grace_period: 45s

@@ -1,0 +1,13 @@
+X-Broker-Demo: DANE TESTOWE
+From: Anna Demonstracyjna <anna@example.invalid>
+To: kancelaria@example.invalid
+Subject: DANE TESTOWE =?utf-8?b?4oCUIE5pZXByYXdpZMWCb3d5IG5hZ8WCw7N3ZWs=?=
+Message-ID: <malformed@broker.example.invalid>
+Content-Type: text/plain; charset="invalid-test-charset"
+Content-Transfer-Encoding: 8bit
+Message-ID: <second@broker.example.invalid>
+MIME-Version: 1.0
+Date:
+
+DANE TESTOWE
+Proszę o sprawdzenie wiadomości.

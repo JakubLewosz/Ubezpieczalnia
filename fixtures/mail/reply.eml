@@ -1,0 +1,15 @@
+X-Broker-Demo: DANE TESTOWE
+From: Anna Demonstracyjna <anna@example.invalid>
+To: kancelaria@example.invalid
+Subject: DANE TESTOWE =?utf-8?q?=E2=80=94_Re=3A_Zapytanie_ofertowe_=E2=80=94?=
+ wniosek komunikacyjny
+Date: Sat, 05 Sep 2026 12:00:00 +0200
+Message-ID: <reply@broker.example.invalid>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+MIME-Version: 1.0
+In-Reply-To: <application@broker.example.invalid>
+References: <application@broker.example.invalid>
+
+DANE TESTOWE
+Proszę o sprawdzenie wiadomości.

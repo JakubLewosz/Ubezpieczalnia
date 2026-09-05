@@ -1,0 +1,34 @@
+X-Broker-Demo: DANE TESTOWE
+From: Anna Demonstracyjna <anna@example.invalid>
+To: kancelaria@example.invalid
+Subject: DANE TESTOWE =?utf-8?q?=E2=80=94_Niedozwolone_typy_za=C5=82=C4=85cz?=
+ =?utf-8?q?nik=C3=B3w?=
+Date: Sat, 05 Sep 2026 12:00:00 +0200
+Message-ID: <blocked@broker.example.invalid>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="===============8864204391573783273=="
+
+--===============8864204391573783273==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+DANE TESTOWE
+Proszę o sprawdzenie wiadomości.
+
+--===============8864204391573783273==
+Content-Type: application/octet-stream
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="DANE TESTOWE.exe"
+MIME-Version: 1.0
+
+REFORSBURVNUT1dFIC0gaW5lcnQgZXhlY3V0YWJsZSBwbGFjZWhvbGRlciwgbmV2ZXIgcnVu
+
+--===============8864204391573783273==
+Content-Type: application/zip
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="DANE TESTOWE.zip"
+MIME-Version: 1.0
+
+REFORSBURVNUT1dFIC0gbm90IGFuIGFyY2hpdmU=
+
+--===============8864204391573783273==--

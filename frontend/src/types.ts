@@ -61,6 +61,7 @@ export interface Job {
   finished_at: string | null;
 }
 export interface DocumentRecord {
+  mail_source?: { message: number; attachment: number; part_key: string } | null;
   id: number;
   client: number;
   client_name: string;
@@ -143,6 +144,9 @@ export interface AuditEvent {
   object_id: number;
 }
 export interface Dashboard {
+  mail_action_count?: number;
+  mail_unassigned_count?: number;
+  mail_mine_count?: number;
   clients_count: number;
   review_count: number;
   failed_count: number;

@@ -1,4 +1,4 @@
-"""Run the four application processes against existing local services."""
+"""Run API, separate OCR/mail workers, beat and frontend against existing local services."""
 
 import os
 import shutil
@@ -24,7 +24,11 @@ def main():
     commands = [
         (ROOT / "backend", [sys.executable, "manage.py", "runserver", "127.0.0.1:8000", "--noreload"]),
         (ROOT / "backend", [sys.executable, "-m", "celery", "-A", "config", "worker", "--loglevel=WARNING",
-                            f"--concurrency={concurrency}", "--prefetch-multiplier=1", "--max-tasks-per-child=20"]),
+                            "--hostname=ocr@%h", "--queues=ocr,celery", f"--concurrency={concurrency}",
+                            "--prefetch-multiplier=1", "--max-tasks-per-child=20"]),
+        (ROOT / "backend", [sys.executable, "-m", "celery", "-A", "config", "worker", "--loglevel=WARNING",
+                            "--hostname=mail@%h", "--queues=mail,maintenance", "--concurrency=1",
+                            "--prefetch-multiplier=1", "--max-tasks-per-child=100"]),
         (ROOT / "backend", [sys.executable, "-m", "celery", "-A", "config", "beat", "--loglevel=WARNING",
                             f"--schedule={ROOT / '.local' / 'celerybeat-schedule'}"]),
         (ROOT / "frontend", [npm, "run", "dev", "--", "--host", "127.0.0.1", "--port", "5173", "--strictPort"]),

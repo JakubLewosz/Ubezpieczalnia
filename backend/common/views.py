@@ -17,20 +17,18 @@ def dashboard(request):
     documents = Document.objects.select_related("client", "author").annotate(
         job_status=Subquery(latest.values("status")[:1])
     )
-    review = documents.filter(job_status="succeeded", draft__isnull=False).filter(
+    review = documents.filter(draft__isnull=False).filter(
         Q(draft__approved_version__isnull=True) | ~Q(draft__approved_version=F("draft__version"))
-    )
-    from extraction.models import EngineResult
-
-    review = review.filter(
-        pk__in=EngineResult.objects.exclude(profile__isnull=True)
-        .exclude(profile="")
-        .values("job__document_id")
     )
     failed = documents.filter(job_status="failed")
     deadlines = expiring(Policy.objects.prefetch_related("participants__client"), 30)
+    from correspondence.models import Message
+    mail = Message.objects.filter(status__in=["todo", "in_progress", "waiting"])
     return Response(
         {
+            "mail_action_count": mail.count(),
+            "mail_unassigned_count": mail.filter(owner__isnull=True).count(),
+            "mail_mine_count": mail.filter(owner=request.user).count(),
             "clients_count": Client.objects.filter(archived=False).count(),
             "review_count": review.count(),
             "failed_count": failed.count(),

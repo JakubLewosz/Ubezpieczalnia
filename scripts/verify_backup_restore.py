@@ -36,6 +36,8 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from documents.models import Document
 from extraction.models import ApprovedRevision
+from correspondence.models import Attachment, Message, ReadReceipt
+from correspondence.sync_models import Mailbox
 from openpyxl import load_workbook
 from rest_framework.test import APIClient
 
@@ -81,8 +83,26 @@ for row, field in zip(rows, revision.fields, strict=True):
     assert not any(c.data_type == "f" for c in row)
 responses[0].close()
 responses[1].close()
+assert not Mailbox.objects.filter(kind="imap", enabled=True).exists(), "Importer kopii nie został wstrzymany."
+assert os.environ.get("MAIL_SYNC_ENABLED") == "false"
+message = Message.objects.exclude(raw_file="").order_by("id").first()
+attachment = Attachment.objects.exclude(file="").filter(blocked_reason="").order_by("id").first()
+assert message and attachment, "Brak wiadomości i dozwolonego załącznika do próby kopii poczty."
+mail_urls = [f"/api/messages/{message.pk}/raw/", f"/api/mail-attachments/{attachment.pk}/download/"]
+for url, expected in zip(mail_urls, [message.raw_sha256, attachment.checksum], strict=True):
+    assert anonymous.get(url).status_code == 403
+    response = authenticated.get(url)
+    assert response.status_code == 200
+    assert "attachment" in response.get("Content-Disposition", "")
+    assert "no-store" in response.get("Cache-Control", "")
+    assert hashlib.sha256(b"".join(response.streaming_content)).hexdigest() == expected
+    response.close()
+mail_counts = {"messages": Message.objects.count(), "attachments": Attachment.objects.count(),
+               "personal_reads": ReadReceipt.objects.count(), "mailboxes": Mailbox.objects.count()}
 print(json.dumps({"anonymous_denied": 3, "authenticated_downloads": 3,
-    "revision_id": revision.pk, "export_fields_verified": len(rows)}, ensure_ascii=False))
+    "revision_id": revision.pk, "export_fields_verified": len(rows), "mail": mail_counts,
+    "mail_anonymous_denied": 2, "mail_authenticated_downloads": 2,
+    "external_sync_paused": True}, ensure_ascii=False))
 '''
 
 
@@ -125,8 +145,29 @@ def database_snapshot(connection, media):
         "SELECT id, fields, document_checksum FROM extraction_approvedrevision ORDER BY id"
     ))
     revision_digest = hashlib.sha256(json.dumps(revisions, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    mail_hashes = {}
+    for table in tables:
+        if table.startswith("correspondence_"):
+            rows = [row[0] for row in connection.execute(
+                sql.SQL("SELECT to_jsonb(t) FROM {} AS t ORDER BY id").format(sql.Identifier("public", table))
+            )]
+            mail_hashes[table] = hashlib.sha256(json.dumps(rows, sort_keys=True).encode()).hexdigest()
+    for table, file_column, checksum_column in (
+        ("correspondence_message", "raw_file", "raw_sha256"),
+        ("correspondence_attachment", "file", "checksum"),
+    ):
+        if table not in tables:
+            continue
+        query = sql.SQL("SELECT {}, {} FROM {} WHERE {} <> ''").format(
+            sql.Identifier(file_column), sql.Identifier(checksum_column), sql.Identifier(table),
+            sql.Identifier(file_column),
+        )
+        for filename, checksum in connection.execute(query):
+            path = (media / filename).resolve()
+            if not path.is_relative_to(media.resolve()) or not path.is_file() or digest_file(path) != checksum:
+                raise RuntimeError("Plik poczty nie istnieje w magazynie lub ma nieprawidłową sumę kontrolną.")
     return {"table_counts": counts, "originals": originals, "revision_count": len(revisions),
-            "revision_fields_sha256": revision_digest}
+            "revision_fields_sha256": revision_digest, "mail_table_sha256": mail_hashes}
 
 
 def checked_process(command, environment, error_file, output=None):
@@ -192,7 +233,17 @@ def main():
             after = database_snapshot(restored, backup / "media")
         if before != after:
             raise RuntimeError("Odtworzona baza różni się od źródła w licznikach, oryginałach lub rewizjach.")
+        # Verify the exact restore first. Then pause ONLY the newly created clone,
+        # retaining business states, personal reads, historical UIDs and cursors.
+        with psycopg.connect(dbname=restore_name, **connection_args) as restored:
+            if "correspondence_mailbox" in after["table_counts"]:
+                restored.execute("""UPDATE correspondence_mailbox
+                    SET enabled=false, state='disabled', error_code='restored_paused',
+                        error_message='Kopia po odtworzeniu. Administrator musi sprawdzić stan i jawnie wznowić import.',
+                        lease_token=NULL, lease_expires=NULL, queued_until=NULL, next_attempt_at=NULL,
+                        version=version+1 WHERE kind='imap'""")
         probe_env = {**cfg, "POSTGRES_DB": restore_name, "MEDIA_ROOT": str(backup / "media"),
+                     "MAIL_SYNC_ENABLED": "false",
                      "DJANGO_ALLOWED_HOSTS": "testserver,localhost,127.0.0.1",
                      "PYTHONPATH": str(ROOT / "backend")}
         probe_env = {str(key): str(value) for key, value in probe_env.items() if value is not None}
@@ -204,7 +255,8 @@ def main():
         report = {"notice": "DANE TESTOWE - spójna kopia i próba odtworzenia", "created_at_utc": stamp,
                   "postgres_version": version, "source_database": source_name, "source_snapshot": before,
                   "database_dump_sha256": digest_file(dump), "media_hashes": source_files,
-                  "restored_database_compared": True, "api_probe": json.loads(result.stdout)}
+                  "restored_database_compared": True, "restored_external_sync_paused": True,
+                  "api_probe": json.loads(result.stdout)}
         (backup / "manifest.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"DANE TESTOWE: kopia i odtworzenie zweryfikowane. Raport: {backup / 'manifest.json'}")
         print(f"Porównano {len(before['table_counts'])} tabel, {len(before['originals'])} oryginałów, "

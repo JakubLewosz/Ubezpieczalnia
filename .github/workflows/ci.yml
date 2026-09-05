@@ -38,8 +38,10 @@ jobs:
       POSTGRES_PORT: "5432"
       REDIS_URL: redis://127.0.0.1:6379/0
       E2E_BASE_URL: http://127.0.0.1:5173
+      E2E_MAIL_SOURCE: imap
       E2E_USERNAME: e2e.demo
       E2E_SECOND_USERNAME: e2e.second
+      E2E_ADMIN_USERNAME: e2e.admin
       OCR_CONCURRENCY: "1"
       OCR_REQUIRED: "1"
       PLAYWRIGHT_JSON_OUTPUT_NAME: ../.local/playwright-results.json
@@ -67,7 +69,8 @@ jobs:
           import os, secrets
           from pathlib import Path
           values = {'DJANGO_SECRET_KEY': secrets.token_urlsafe(64),
-                    'E2E_PASSWORD': secrets.token_urlsafe(32), 'E2E_SECOND_PASSWORD': secrets.token_urlsafe(32)}
+                    'E2E_PASSWORD': secrets.token_urlsafe(32), 'E2E_SECOND_PASSWORD': secrets.token_urlsafe(32),
+                    'E2E_ADMIN_PASSWORD': secrets.token_urlsafe(32)}
           # Mask each value BEFORE writing GITHUB_ENV or using it in any later step.
           for value in values.values():
               print('::add-mask::' + value, flush=True)
@@ -87,6 +90,12 @@ jobs:
           uv run --project backend pytest backend/tests --junitxml=.local/pytest-results.xml
           uv run --project backend python backend/manage.py makemigrations --check --dry-run
           uv run --project backend ruff check backend scripts
+      - name: Prawdziwy lokalny IMAP z TLS, flagami i błędnym certyfikatem
+        run: |
+          python3 scripts/local_imap.py init
+          python3 scripts/local_imap.py start
+          uv run --project backend python scripts/check_imap_protocol.py --fixture fixtures/mail/application.eml
+          RUN_LOCAL_IMAP_TESTS=1 uv run --project backend pytest backend/tests/test_mail_sync_integration.py --junitxml=.local/imap-results.xml
       - name: Frontend
         run: |
           npm run check --prefix frontend
@@ -104,10 +113,13 @@ jobs:
           subprocess.run([sys.executable, 'backend/manage.py', 'seed_demo', '--username', os.environ['E2E_SECOND_USERNAME'],
               '--role', 'EMPLOYEE', '--password-stdin', '--without-documents'],
               input=os.environ['E2E_SECOND_PASSWORD'] + '\n', text=True, check=True)
+          subprocess.run([sys.executable, 'backend/manage.py', 'seed_demo', '--username', os.environ['E2E_ADMIN_USERNAME'],
+              '--role', 'ADMIN', '--password-stdin', '--without-documents'],
+              input=os.environ['E2E_ADMIN_PASSWORD'] + '\n', text=True, check=True)
           PY
       - name: Uruchomienie aplikacji
         run: |
-          uv run --project backend python scripts/dev.py > .local/dev.log 2>&1 &
+          uv run --project backend python scripts/local_imap.py run-dev > .local/dev.log 2>&1 &
           echo $! > .local/dev.pid
           python - <<'PY'
           import time, urllib.request
@@ -139,6 +151,7 @@ jobs:
         if: always()
         run: |
           if [ -f .local/dev.pid ]; then kill "$(cat .local/dev.pid)" || true; fi
+          if [ -f .local/imap-test/local.json ]; then python3 scripts/local_imap.py stop; fi
   compose:
     runs-on: ubuntu-24.04
     timeout-minutes: 25

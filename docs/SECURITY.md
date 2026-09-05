@@ -22,12 +22,12 @@ Repozytorium **nie jest kopią danych**. Odtworzenie wymaga PostgreSQL oraz odpo
 
 Procedura dla lokalnych danych testowych:
 
-1. Zakończ procesy Django, frontend, worker i beat przez Ctrl+C w `scripts/dev.py`. W Compose wykonaj `docker compose stop frontend backend worker beat`. PostgreSQL pozostaje uruchomiony. Nie wykonuj kopii przy aktywnych zapisach plików/OCR.
+1. Zakończ procesy Django, frontend, worker i beat przez Ctrl+C w `scripts/dev.py`. W Compose wykonaj `docker compose stop frontend backend worker mail-worker beat`. PostgreSQL pozostaje uruchomiony. Nie wykonuj kopii przy aktywnych zapisach plików/OCR.
 2. Utwórz nowy katalog `.local/backups/<czas>` z prawami 0700. Nigdy nie dodawaj go do Git.
 3. Wykonaj `pg_dump --format=custom --no-owner --no-privileges` właściwej bazy, podając konfigurację przez lokalne zmienne środowiskowe. Nie wpisuj hasła do polecenia ani historii powłoki. W Compose uruchom ten sam program przez `docker compose exec -T db`; wartości `POSTGRES_USER`/`POSTGRES_DB` pochodzą z kontenera.
-4. Skopiuj cały `MEDIA_ROOT` do tej samej kopii (oryginały oraz `previews`). W Compose spakuj wolumen `private_media` przy pomocy `docker compose run --rm --no-deps --entrypoint tar backend -czf - -C /app/.local/media .`.
+4. Skopiuj cały `MEDIA_ROOT` do tej samej kopii (oryginały, `previews`, prywatne źródła maili i załączniki). W Compose spakuj wolumen `private_media` przy pomocy `docker compose run --rm --no-deps --entrypoint tar backend -czf - -C /app/.local/media .`.
 5. Zapisz metadane: czas UTC, wersję PostgreSQL, commit aplikacji, listę plików oraz SHA-256 dumpa i archiwum. Sekret aplikacji przechowuj oddzielnie; nie dopisuj go do manifestu.
-6. Wznowienie: `uv run --project backend python scripts/dev.py` albo `docker compose start backend worker beat frontend`.
+6. Wznowienie: `uv run --project backend python scripts/dev.py` albo `docker compose start backend worker mail-worker beat frontend`.
 
 Do przekierowania dumpa i archiwum w PowerShell używaj plików binarnych przez Python `subprocess.run(..., stdout=otwarty_plik_wb)` lub PowerShell 7.4+. Starszy PowerShell może zmieniać binarne dane przy `>`; nie używaj tak powstałej kopii bez weryfikacji.
 
@@ -69,7 +69,7 @@ Polecenie wymaga `DJANGO_ENV=development` i nieaktywnych portów aplikacji 8000/
 1. Użyj oddzielnego klona, nowej konfiguracji i pustej bazy/wolumenu; nie nadpisuj jedynej działającej kopii demonstracji. Zweryfikuj SHA-256 obu plików zgodnie z manifestem.
 2. Uruchom tylko PostgreSQL i Redis. Odtwórz dump przez `pg_restore --no-owner --no-privileges --exit-on-error -d <pusta_baza> database.dump`. Użyj tej samej wersji PostgreSQL 17 albo zgodnej nowszej wersji narzędzi do zaplanowanej migracji.
 3. Rozpakuj własne zweryfikowane archiwum do pustego `MEDIA_ROOT`; zachowaj uprawnienia 0600/0700 i właściciela procesu aplikacji (UID/GID 10001 w obrazie). Nie rozpakowuj niezaufanych archiwów do magazynu.
-4. Uruchom migracje aplikacji zgodnej z kopią. Uruchom worker i beat; wygasłe lease pozwolą odzyskać przerwane zadania. Kolejka Redis nie jest źródłem zatwierdzonych danych i może zostać odtworzona przez mechanizm odzyskiwania zadań.
+4. Uruchom migracje aplikacji zgodnej z kopią. Przed uruchomieniem workerów i beat jawnie wstrzymaj zewnętrzną pocztę w odtworzonej bazie i ustaw MAIL_SYNC_ENABLED=false. Zachowaj cursor/UIDVALIDITY oraz pracę i odczyty; usuń wyłącznie dzierżawę i zlecenie integracji. Wygasłe lease OCR pozwolą odzyskać przerwane zadania. Kolejka Redis nie jest źródłem zatwierdzonych danych i może zostać odtworzona przez mechanizm odzyskiwania zadań.
 5. Unieważnij odzyskane sesje przed udostępnieniem odtworzonej demonstracji (jawna operacja Django: `Session.objects.all().delete()` na odtworzonej bazie). Utwórz lub jawnie zresetuj hasło konta developerskiego.
 6. Porównaj liczbę klientów, polis, dokumentów i rewizji z kopią; pobierz oryginał i sprawdź SHA-256, otwórz PNG oraz eksport historycznej rewizji. Sprawdź też restart usług i brak anonimowego dostępu.
 
@@ -83,3 +83,17 @@ Wynik próby, czas i ewentualne luki zapisz w STATUS. Sama obecność tej proced
 - Audyt bezpieczeństwa, skanowanie uploadów, izolacja parserów, test przeciążenia i przegląd licencji.
 - Właściciel procedury backup/restore, monitoring, alerty, odtwarzanie po awarii i okresowe ćwiczenia.
 - Uzgodniony profil eksportu i ręczna odpowiedzialność za zatwierdzane wartości. OCR nie zastępuje weryfikacji dokumentu.
+
+## Poczta i naprawa audytu
+
+Integracja domyślnie wyłączona. Sekret jest wyłącznie po stronie serwera, poza bazą, API i VITE_. Interfejs administratora nie przyjmuje dowolnego hosta. TLS sprawdza certyfikat i nazwę serwera, lokalne testy używają własnego jawnego CA bez globalnego obejścia. Klient protokołu wyłącza pierścień diagnostyczny imaplib, który mógłby zachować LOGIN/treść. Błędy synchronizacji mają stałe komunikaty, nie serializują wyjątków zawierających niezaufane dane.
+
+EXAMINE i BODY.PEEK nie zmieniają flag; APPEND istnieje wyłącznie w jawnym lokalnym injectorze syntetycznych fixture. Nie ma SMTP. MIME jest ograniczone rozmiarem przed odczytem literału, rzeczywistymi bajtami, liczbą/głębokością części i limitami danych zdekodowanych. HTML ma wyłącznie tekstowy widok. Pliki mają losowe klucze, auth/attachment/no-store; blokowane typy nie mają aktywnego podglądu. Nie ma antywirusa, a poprawny format nie jest oceną bezpieczeństwa.
+
+Hasła i klucz sesji CI są maskowane PRZED zapisem do GITHUB_ENV. Artefakt błędu ma wyłącznie dozwolone nazwy testów/liczniki i statusy; nie publikuje śladów uwierzytelnionej sesji, prywatnych plików, tracebacków z treścią ani logów. Historyczne ustalenie dotyczyło jednorazowych wartości CI, nie potwierdzonego wycieku hasła kancelarii.
+
+Eksport waliduje XML1.0 i limit 32767 znaków także w nazwach/metadanych. Historycznej rewizji nie czyścimy ani nie obcinamy w miejscu: niepoprawna wartość powoduje kontrolowane 400 z instrukcją nowej korekty. Formatowanie komórek nie wykonuje tekstu formułopodobnego.
+
+Rozszerzony test backup/restore porównuje pełne snapshoty tabel correspondence (w manifeście tylko hash), sumy plików, osobiste odczyty, statusy i cursor. Wstrzymuje importer WYŁĄCZNIE w odtworzonej bazie przed uruchomieniem aplikacji; źródła nie modyfikuje. Po odtworzeniu ADMIN kontroluje tożsamość folderu i dopiero świadomie wznawia integrację, aby nie uruchomić drugiego importera. Szczegóły: MAILBOX i LOCAL_IMAP.
+
+Zapis poczty i promocja załącznika rezerwują klucz w trwałym dzienniku plików przed zapisem bajtów (osobne krótkie połączenie do tej samej bieżącej bazy). Żywy writer trzyma blokadę advisory. Po awarii maintenance sprząta tylko niepowiązane własne klucze z wygasłym 15-minutowym okresem ochronnym; nie skanuje ani nie usuwa arbitralnie pozostałego magazynu. Test rzeczywistego SIGKILL przed commitem i testy aktywnej blokady/referencji są w test_mail_storage.py.

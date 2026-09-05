@@ -1,0 +1,40 @@
+name: broker-imap-test
+
+services:
+  imap-test-init:
+    image: python:3.12.13-slim-bookworm@sha256:4766d8b510c428e595d74b9cc5bbb2fae8e26316fffb4adc89908d79aacd58a2
+    command: [python, /prepare.py]
+    network_mode: none
+    volumes:
+      - ${BROKER_IMAP_DIR:-./.local/imap-test}:/source:ro
+      - ./scripts/prepare_imap_volume.py:/prepare.py:ro
+      - server_config:/target/server
+      - client_config:/target/client
+      - mailstore:/target/mail
+  imap-test:
+    image: dovecot/dovecot:2.4.5@sha256:c807be4fb5a97d9c3a90770569d3a6c4cbdcb36742ad41f90409cbd929166553
+    command: [/dovecot/sbin/dovecot, -F, -c, /broker-config/dovecot.conf]
+    depends_on:
+      imap-test-init:
+        condition: service_completed_successfully
+    ports:
+      - 127.0.0.1:${BROKER_IMAP_PORT:-19993}:31993
+    volumes:
+      - server_config:/broker-config:ro
+      - mailstore:/srv/vmail
+    tmpfs:
+      - /run/dovecot:uid=1000,gid=1000,mode=0700
+      - /tmp:uid=1000,gid=1000,mode=0700
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    # The official login binary carries this file capability even with an empty chroot.
+    cap_add: [SYS_CHROOT]
+    mem_limit: 384m
+    pids_limit: 96
+
+volumes:
+  server_config:
+  client_config:
+  mailstore:

@@ -24,7 +24,11 @@ Migracja 0002 na istniejącej demonstracji zachowała JSON obu historycznych zat
 
 ## Etap B
 
-Rozpoczęto po zaliczeniu powyższej bramki. Zakres obejmuje PostgreSQL/API/UI, MIME, idempotentny import i załączniki, read-only IMAP z lokalnym serwerem TLS, osobiste przeczytanie oddzielne od pracy, współbieżność, oddzielną kolejkę i integracyjny Playwright.
+Zaimplementowano PostgreSQL/API/UI, MIME, idempotentny import i załączniki, read-only IMAP z lokalnym Dovecot/TLS, osobiste przeczytanie oddzielne od pracy, współbieżność, oddzielną kolejkę i integracyjny Playwright.
+
+Wykonano: 23 regresje synchronizacji/PostgreSQL; rzeczywisty klient TLS z flags/UID/SHA bez zmian i odrzuceniem błędnego certyfikatu; rzeczywisty sync → PostgreSQL → API osobistego odczytu (1 passed /1,29 s). Dwa pełne scenariusze Playwright poczty przeszły w 48,1 s, w tym klient 26, OCR i realne komórki XLSX, done → nowy reply todo oraz newsletter z powodem no_action. Mail został pobrany po 4,08 s podczas trwającego 25,01 s OCR przy zamkniętej przeglądarce.
+
+Po dołączeniu trwałego dziennika plików pełny backend: **183 passed, 1 skipped /24,45 s**; pominięty był wyłącznie jawnie aktywowany test lokalnego IMAP, wcześniej wykonany osobno z rzeczywistym serwerem. Test dziennika przerwał faktyczny subprocess SIGKILL po zapisie przed commitem i potwierdził późniejsze sprzątnięcie tylko osieroconego klucza. Żywy writer, aktywna dzierżawa i plik z referencją są chronione. Końcowa weryfikacja dodatkowych konfliktów/HTML, Compose B, backup/restore oraz zdalnego CI trwa.
 
 ## Plan
 

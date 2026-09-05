@@ -1,9 +1,19 @@
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
-export async function login(page: Page, secondary = false) {
-  const username = secondary ? process.env.E2E_SECOND_USERNAME : process.env.E2E_USERNAME;
-  const password = secondary ? process.env.E2E_SECOND_PASSWORD : process.env.E2E_PASSWORD;
+export async function login(page: Page, secondary: boolean | 'admin' = false) {
+  const username =
+    secondary === 'admin'
+      ? process.env.E2E_ADMIN_USERNAME
+      : secondary
+        ? process.env.E2E_SECOND_USERNAME
+        : process.env.E2E_USERNAME;
+  const password =
+    secondary === 'admin'
+      ? process.env.E2E_ADMIN_PASSWORD
+      : secondary
+        ? process.env.E2E_SECOND_PASSWORD
+        : process.env.E2E_PASSWORD;
   if (!username || !password)
     throw new Error(
       'Ustaw jawne konta testowe E2E_USERNAME/PASSWORD oraz E2E_SECOND_USERNAME/PASSWORD.',

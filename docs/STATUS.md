@@ -1,55 +1,32 @@
-# Stan MVP — 5 września 2026
+# Stan Broker Office — naprawa i wspólna skrzynka, 2026-09-05
 
-Zaimplementowano działający zakres demonstracyjny Broker Office. Kluczowy przebieg wykonano w prawdziwej przeglądarce Chromium: sesja Django → kartoteka → upload → osobny worker Celery/Redis → lokalny odczyt → korekta → zatwierdzona rewizja → pobranie XLSX. Nie są to atrapy API. Baza PostgreSQL i prywatny magazyn zapisują dane na dysku.
+Rozwinięto istniejące MVP od commita `b9460085db68688c2c38b2c896cb5106ee6cadbd` na `codex/broker-office-mailbox`. Naprawa dokumentów jest osobnym commitem `2c1ec08`. Historyczne wyniki pierwszego MVP zachowano w [HISTORICAL_STATUS_b946008](HISTORICAL_STATUS_b946008.md); nie są wynikami obecnego odbioru.
 
-## Działające obszary
+## Etap A
 
-- Indywidualne konta ADMIN/EMPLOYEE, CSRF także logowania, ograniczanie prób według IP i konta, odwołanie sesji, administracja kontami i reset hasła bez poczty. Panel Django korzysta ze wspólnego logowania; flaga `is_staff` nie zastępuje roli biznesowej.
-- Osoby i organizacje, edycja, wyszukiwanie także przez numer polisy, normalizacja bez zmiany oryginalnych danych, paginacja/sortowanie i archiwizacja. Ostrzeżenia o potencjalnych duplikatach oraz unikalność podanego PESEL/NIP wymuszona przez PostgreSQL również przy równoczesnym dodawaniu.
-- Ręczne polisy, kilka osób w roli ubezpieczonego i ta sama osoba w obu rolach, powiązane dokumenty, Decimal/NULL składki, daty kalendarzowe, wyliczany status oraz domknięte terminy Europe/Warsaw.
-- Prywatne oryginały i PNG stron, walidacja formatów/zawartości/rozmiarów, sumy kontrolne, brak publicznego `/media/`. DOCX/XLSX tylko jako załączniki.
-- pypdf, PDFium oraz Tesseract `pol+eng`: rzeczywiste tekstowe, obrazowe i mieszane wejścia. Profil komunikacyjnego wniosku brokerskiego, jawne braki i ostrzeżenia, źródła/strony/metoda. Rozdzielone numery, daty ochrony, data dokumentu, składka i suma.
-- Wynik silnika, szkic i zatwierdzenia są oddzielne. Korekty nie udają źródła, poprzednie rewizje zostają zachowane, ponowny odczyt wymaga jawnego przejęcia wyniku do szkicu. Konflikty wersji zamiast cichego nadpisania.
-- `review_export_v0`: arkusze Informacje/Dane, konkretna zatwierdzona rewizja, powtarzalne grupy, daty/liczby/zera wiodące, tekst bez aktywnych formuł, audyt eksportu.
-- Polski, jasny interfejs, źródła przełączające strony, powiększenie, układ mobilny, etykiety/fokus/klawiatura i ochrona niezapisanych zmian. Brak pustych zakładek przyszłych integracji.
+A01–A09 odtworzono i poprawiono, z rozróżnieniem części A08, w której zachowanie notatki po konflikcie było już prawidłowe. Szczegółowe dowody i regresje: [REMEDIATION_STATUS](REMEDIATION_STATUS.md). Lockfile przeszedł czyste npm ci na macOS ARM64 i Linux ARM64/AMD64. Instalacja Python pozostaje zamrożona. Obowiązkowy OCR zawodzi przy braku programu/języków.
 
-## Faktycznie wykonana weryfikacja
+Numerowany profil wniosku komunikacyjnego ma źródła, jeden uczestnik może pełnić obie role, a NNW 10000 PLN jest kwotą własnego zakresu, nie składką. Ręczne grupy i ratunek, aktualne ostrzeżenia i potwierdzenia, bezpieczny eksport oraz pełne selektory przeszły API i przeglądarkę. Historyczna migracja zachowała dwie wcześniejsze rewizje/XLSX i wszystkie 41 plików początkowej demonstracji.
 
-| Weryfikacja | Wynik |
-|---|---|
-| Świeża baza PostgreSQL 17.11, migracje, jawny seed | wykonane; seed nie resetuje danych przy starcie |
-| `pytest backend/tests` | **73 passed**, 9,90 s w końcowym pełnym uruchomieniu |
-| Prawdziwy Tesseract, tekst/scan/mixed/PNG/JPEG oraz holdout | wykonane, z jawnymi odchyleniami OCR opisanymi w TESTING |
-| Dwuwątkowe zapisy do PostgreSQL | jeden sukces i jeden konflikt; tożsamość klienta, szkic i zatwierdzenie |
-| Konta i pliki bez sesji, CSRF, reset konta, role | sprawdzone testami backendu |
-| XLSX: zawartość, daty, kwoty, identyfikatory, niezmienność, formuły | sprawdzone przez openpyxl i XML wygenerowanego pliku |
-| Migracje `--check --dry-run`, Ruff backend + scripts | poprawne; brak zmian migracji |
-| Frontend ESLint, TypeScript strict, Prettier | poprawne |
-| Vitest/Testing Library | **10 passed** |
-| Vite build | poprawny |
-| Playwright Chromium, prawdziwe API + worker | **2 passed**, 8,3 s po poprawkach etykiet i obserwowania raportów Vite |
-| Dodatkowa obsługa przez przeglądarkę | firma + reload; polisa z trzema relacjami, Decimal/NULL, edycja i archiwizacja |
-| Wizualna kontrola i interakcje źródła/powiększenia | 9 zrzutów, widoki 1440 i 390 px, bez poziomego overflow przy 390 px i bez błędów JS |
-| Przerwanie procesu OCR | rzeczywisty SIGKILL procesu wykonawczego; naturalne wygaśnięcie lease, druga próba i kontrolowany błąd limitu zakresów po 374 s; brak utknięcia i dodatkowego wyniku |
-| Backup/restore do osobnej bazy | zgodne liczniki 20 tabel, SHA-256 7 oryginałów i 41 plików oraz pola 2 rewizji; API odmówiło 3 anonimowych pobrań, uwierzytelnione oryginał/PNG/historyczny XLSX poprawne |
-| Restart aplikacji, PostgreSQL i Redis | te same liczniki, pliki i rewizje; w przeglądarce zachowana sesja, widoczny szkic/podgląd i pobranie oryginału HTTP 200 |
-| Własność lokalnego Redis i konfiguracja startu | 5 testów zgodności/odmowy obcej instancji; rzeczywisty status/start/stop własnych usług; jawne środowisko produkcyjne poprawnie blokuje `dev.py` mimo developerskiego `.env` |
-| `docker compose config --quiet` | poprawna konfiguracja |
+Przed rozpoczęciem poczty wykonano prawdziwy proces dokumentowy. Native: 5 scenariuszy Playwright w osobnych biegach; po przebudowie Compose komplet **5 passed / 26,3 s**. Frontend A: lint, TypeScript, 23 testy i build. Backend przed ostatnimi dodatkowymi regresjami: 123 passed /18,97 s; osobny końcowy zestaw ekstrakcji/eksportu 74 passed.
 
-Pierwsze uruchomienia Playwright zatrzymały się na zbyt dokładnym dopasowaniu etykiety Hasło z gwiazdką. Poprawiono dostępność etykiety, selektor i wykluczono raporty Playwright z obserwacji Vite; końcowy pełny przebieg przeszedł. Nie zaliczano tych przerwanych uruchomień jako sukcesów.
+## Poczta
 
-## Środowisko i czego nie sprawdzono
+Działa PostgreSQL/API/UI i rzeczywisty klient IMAP. Kolejka pracy, własność, wersje, przekazanie ADMIN, jawne zakończenie/ponowne otwarcie i osobiste odczyty są oddzielone. Źródła demo i IMAP pozostają osobnymi rekordami; sam adres nadawcy nie przypisuje klienta. Każdy nowy UID, także odpowiedź po done, tworzy todo. Załącznik jest idempotentnie zapisywany w dokumentach wybranego klienta i używa istniejącego OCR/XLSX.
 
-Uruchomiono natywnie na macOS: Python 3.12.13, Django 5.2.17, DRF 3.18.0, PostgreSQL 17.11, Redis 8.10.1, Tesseract 5.5.3 z pol/eng, Node 24.11.0. Pełne wersje zależności są w lockfile i LICENSES.
+MIME ma tekstowy widok, limity, prywatne pliki i powody blokady części. IMAP używa EXAMINE, UID i BODY.PEEK ze sprawdzonym TLS; ma trwałe pending, granicę startową, dzierżawę, limitowane ponowienia i jawne odbudowanie po UIDVALIDITY. Workery poczty i OCR są osobne. Konfiguracja serwerowa i synchronizacja zewnętrzna domyślnie wyłączona.
 
-Demon Docker nie działał (brak gniazda `~/.docker/run/docker.sock`). **Nie wykonano budowania ani uruchomienia kontenerów Compose**, testów na Windows/WSL ani zdalnego joba GitHub Actions. Compose przypina Redis 8.2.9 i Node 22.23.2, inne niż wersje natywne; te obrazy wymagają oddzielnego przebiegu. Dokładne komendy znajdują się w README i TESTING. Nie wykonywano testu obciążeniowego 10 pracowników/500 klientów, testów penetracyjnych ani testów na danych rzeczywistych.
+## Wykonane próby etapu B
 
-`DJANGO_ENV=production ... check --deploy` pozostawia jedynie W021: HSTS preload nie jest włączony bez uzgodnionej domeny. Lokalny tryb HTTP celowo zgłasza ostrzeżenia wdrożeniowe; nie jest konfiguracją produkcyjną. Natywne kontrolki daty w formularzach mogą używać formatu języka przeglądarki/systemu; prezentacja zapisanych dat i kwot aplikacji jest polska, a API używa ISO/Decimal.
+- Rzeczywisty Dovecot 2.4.5/TLS/IMAP4rev1: flags, UID i pełne SHA-256 wiadomości przed/po pozostają identyczne, także Seen; niewłaściwy certyfikat odrzucony. Protokół nie jest mockiem.
+- 23 regresje synchronizacji na PostgreSQL: granica i mail podczas inicjalizacji, sparse/empty UID, przerwanie/retry, auth/TLS, fencing, recovery UIDVALIDITY, test bez treści i konfiguracja. Osobny rzeczywisty Dovecot → sync → PostgreSQL → API/read → powtórny sync: 1 passed /1,29 s.
+- Pełny Playwright poczty na Dovecot + Redis/Celery: **2 passed /48,1 s**. Inject → worker → todo → osobiste otwarcie → przejęcie → drugi pracownik → klient 26 z dalszej strony → PDF/OCR/weryfikacja/rzeczywiste komórki XLSX → done → kolejna odpowiedź nowe todo. Newsletter no_action wymaga powodu.
+- Przy zamkniętej przeglądarce 30-stronicowy OCR trwał 25,01 s, a beat/mailworker pobrał nowy mail po 4,08 s podczas statusu running OCR. Mail pozostał todo bez właściciela i odczytów. Sam wielokrotnie powielony dokument OCR zakończył się oczekiwanym błędem limitu pozycji zakresu; nie oznaczamy go jako udanej ekstrakcji.
 
-## Znane ograniczenia i następny etap
+Końcowe zbiorcze testy po dzienniku plików, dodatkowe konflikty/HTML/układ, świeży Compose B, rozszerzony backup/restore oraz zdalne CI są jeszcze w trakcie odbioru. Wyniki zostaną dopisane po rzeczywistym wykonaniu.
 
-OCR może mylić O/0, znaki diakrytyczne i znak `@`. Nie zastępujemy ich domysłami. Nielegalny VIN i niejednoznaczny e-mail pozostają puste z ostrzeżeniem; inne wartości OCR wymagają kontroli źródła. Syntetyczny zestaw nie określa skuteczności na dokumentach kancelarii.
+## Ograniczenia
 
-To lokalna demonstracja: brak antywirusa, MFA, produkcyjnej izolacji/monitoringu i uzgodnionych zasad retencji/dostępu. Brak poczty, migracji i docelowego Excela jest świadomą granicą zakresu. Nie deklarujemy gotowości produkcyjnej ani zgodności z RODO.
+Weryfikowano lokalny serwer IMAP, **nie Interię ani konto kancelarii**. Nie wykonano próby obciążenia 10 osób/500 klientów, Windows/WSL, testu penetracyjnego ani audytu produkcyjnego. Brak SMTP, pełnej historii/spamu/kosza, zewnętrznego AI, antywirusa, docelowego Excela kancelarii, automatycznych klientów/polis i masowej migracji. OCR może mylić O/0, diakrytykę i walutę; wymaga kontroli źródeł. Syntetyczne dane nie określają skuteczności w kancelarii.
 
-Następny krok: warsztat odbiorczy na syntetycznych dokumentach, ustalenie ról i procesu odnowień, uzgodnienie docelowego mapowania Excel oraz checklisty bezpieczeństwa/infrastruktury przed jakimikolwiek rzeczywistymi danymi. Szczegóły: DECISIONS, SECURITY i BACKLOG.
+Instrukcje od czystego klona: [README](../README.md), [LOCAL_IMAP](LOCAL_IMAP.md), [MAILBOX](MAILBOX.md). Szczegóły lockfile/Compose: [INSTALL_REMEDIATION](INSTALL_REMEDIATION.md). Nie zmieniano widoczności repo, nie scalano gałęzi i nie wdrażano produkcyjnie.
