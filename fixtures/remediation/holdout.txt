@@ -1,0 +1,18 @@
+DANE TESTOWE
+Miasto Testowe, 30/08/2026
+Wniosek brokerski nr. TEST/2026/HOLDOUT
+(zapytanie ofertowe)
+IV. Okres ubezpieczenia: 06/09/2026 - 05/09/2027
+III. Rodzaj i zakres ubezpieczenia:
+a. OC - ustawowe minimalne sumy gwarancyjne
+b. NNW - 20.000,75 PLN
+c. Assistance - wariant EUROPA
+I. Ubezpieczający/Ubezpieczony: Celina Fikcyjna, 00-000 Miasto Testowe, ul. Makietowa 3
+PESEL: nie podano
+Tel. 000 000 002
+II. Przedmiot ubezpieczenia:
+samochód osobowy MarkaTestowa ModelPróbny, nr rej DEMO003
+rok prod 2022, VIN: TEST1234567890125, liczba miejsc 7
+V. Informacje o kliencie i inne:
+ostatni Ubezpieczyciel: Firma Testowa (polisa 000125)
+VI. Warunki płatności: dwie raty przelewem

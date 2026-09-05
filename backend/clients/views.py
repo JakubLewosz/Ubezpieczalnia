@@ -7,6 +7,7 @@ from common.api import Conflict
 from common.audit import record
 from common.models import AuditEvent
 from common.normalization import normalize
+from common.query import positive_ids
 from .models import Client
 from .serializers import ClientSerializer
 
@@ -17,6 +18,9 @@ class ClientViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Client.objects.all()
+        excluded = positive_ids(self.request.query_params.get("exclude"), "exclude")
+        if excluded:
+            qs = qs.exclude(pk__in=excluded)
         if self.action == "list":
             archived = self.request.query_params.get("archived", "false")
             if archived != "all":

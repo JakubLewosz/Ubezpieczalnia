@@ -17,7 +17,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { api, date, dateTime, params, patch, post } from './api';
-import { useApi, useDebounce } from './hooks';
+import { useApi, useDebounce, useMounted } from './hooks';
 import type { AuditEvent, Client, DocumentRecord, Page, Policy } from './types';
 import {
   Alert,
@@ -214,8 +214,9 @@ export function ClientFormPage() {
     />
   );
 }
-function ClientForm({ initial, reload }: { initial: Client | null; reload: () => void }) {
+export function ClientForm({ initial, reload }: { initial: Client | null; reload: () => void }) {
   const navigate = useNavigate();
+  const mounted = useMounted();
   const [values, setValues] = useState<ClientInput>(initial ?? emptyClient),
     [dirty, setDirty] = useState(false),
     [error, setError] = useState<unknown>(null),
@@ -239,6 +240,7 @@ function ClientForm({ initial, reload }: { initial: Client | null; reload: () =>
   }
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -251,7 +253,9 @@ function ClientForm({ initial, reload }: { initial: Client | null; reload: () =>
       const client = initial
         ? await patch<Client>(`/api/clients/${initial.id}/`, payload)
         : await post<Client>('/api/clients/', payload);
+      if (!mounted.current) return;
       flushSync(() => {
+        setBusy(false);
         setDirty(false);
         setSaved(client);
       });
@@ -265,7 +269,7 @@ function ClientForm({ initial, reload }: { initial: Client | null; reload: () =>
   const possible = similar.data?.results.filter((client) => client.id !== initial?.id) ?? [];
   return (
     <>
-      <UnsavedGuard dirty={dirty} />
+      <UnsavedGuard dirty={dirty || !!busy} />
       <PageHeading
         title={initial ? 'Edytuj klienta' : 'Nowy klient'}
         description="Nieznane dane możesz uzupełnić później. Pola z gwiazdką są wymagane."
@@ -275,148 +279,153 @@ function ClientForm({ initial, reload }: { initial: Client | null; reload: () =>
         }}
       />
       <form className="panel form-panel" onSubmit={submit}>
-        {!!error && (
-          <ErrorNotice
-            error={error}
-            onReload={initial ? () => setConfirmReload(true) : undefined}
-          />
-        )}
-        <Warnings items={saved?.duplicate_warnings} />
-        {saved && (
-          <Alert kind="success">
-            Kartoteka została zapisana.{' '}
-            <Link to={`/clients/${saved.id}`}>
-              Przejdź do klienta <ArrowUpRight size={14} />
-            </Link>
-          </Alert>
-        )}
-        {possible.length > 0 && !saved && (
-          <Alert kind="warning">
-            Sprawdź możliwe duplikaty:{' '}
-            {possible.slice(0, 3).map((client, index) => (
-              <span key={client.id}>
-                {index ? ', ' : ''}
-                <Link to={`/clients/${client.id}`}>{client.display_name}</Link>
-              </span>
-            ))}
-            . Wspólny kontakt ani podobna nazwa nie potwierdzają tożsamości. Kartoteki nie zostaną
-            automatycznie połączone.
-          </Alert>
-        )}
-        <h2>Dane podstawowe</h2>
-        <fieldset className="segmented">
-          <legend className="sr-only">Typ klienta</legend>
-          <label className={values.kind === 'person' ? 'selected' : ''}>
-            <input
-              type="radio"
-              name="kind"
-              value="person"
-              checked={values.kind === 'person'}
-              onChange={() => update('kind', 'person')}
+        <fieldset disabled={busy} className="form-lock">
+          {!!error && (
+            <ErrorNotice
+              error={error}
+              onReload={initial ? () => setConfirmReload(true) : undefined}
             />
-            <UserRound size={17} />
-            Osoba fizyczna
-          </label>
-          <label className={values.kind === 'organization' ? 'selected' : ''}>
-            <input
-              type="radio"
-              name="kind"
-              value="organization"
-              checked={values.kind === 'organization'}
-              onChange={() => update('kind', 'organization')}
-            />
-            <Building2 size={17} />
-            Organizacja
-          </label>
-        </fieldset>
-        <div className="form-grid">
-          {values.kind === 'person' ? (
-            <>
-              <FieldLabel label="Imię" required>
-                <input
-                  required
-                  autoComplete="given-name"
-                  value={values.first_name}
-                  onChange={(event) => update('first_name', event.target.value)}
-                />
-              </FieldLabel>
-              <FieldLabel label="Nazwisko" required>
-                <input
-                  required
-                  autoComplete="family-name"
-                  value={values.last_name}
-                  onChange={(event) => update('last_name', event.target.value)}
-                />
-              </FieldLabel>
-              <FieldLabel label="PESEL" hint="Opcjonalny identyfikator; przechowywany jako tekst.">
-                <input
-                  inputMode="numeric"
-                  value={values.pesel}
-                  onChange={(event) => update('pesel', event.target.value)}
-                />
-              </FieldLabel>
-            </>
-          ) : (
-            <>
-              <FieldLabel label="Nazwa organizacji" required className="span-2">
-                <input
-                  required
-                  value={values.organization_name}
-                  onChange={(event) => update('organization_name', event.target.value)}
-                />
-              </FieldLabel>
-              <FieldLabel label="NIP" hint="Opcjonalny identyfikator; przechowywany jako tekst.">
-                <input
-                  inputMode="numeric"
-                  value={values.nip}
-                  onChange={(event) => update('nip', event.target.value)}
-                />
-              </FieldLabel>
-            </>
           )}
-        </div>
-        <div className="form-divider" />
-        <h2>Kontakt i adres</h2>
-        <div className="form-grid">
-          <FieldLabel label="E-mail" hint="W demonstracji używaj domeny .invalid.">
-            <input
-              type="email"
-              autoComplete="email"
-              value={values.email}
-              onChange={(event) => update('email', event.target.value)}
-            />
-          </FieldLabel>
-          <FieldLabel label="Telefon">
-            <input
-              type="tel"
-              autoComplete="tel"
-              value={values.phone}
-              onChange={(event) => update('phone', event.target.value)}
-            />
-          </FieldLabel>
-          <FieldLabel label="Adres" className="span-2">
-            <textarea
-              rows={2}
-              value={values.address}
-              onChange={(event) => update('address', event.target.value)}
-            />
-          </FieldLabel>
-          <FieldLabel label="Notatka" className="span-2">
-            <textarea
-              rows={3}
-              value={values.note}
-              onChange={(event) => update('note', event.target.value)}
-            />
-          </FieldLabel>
-        </div>
-        <div className="form-actions">
-          <Link className="button secondary" to={initial ? `/clients/${initial.id}` : '/clients'}>
-            Anuluj
-          </Link>
-          <Button type="submit" disabled={busy || !!saved}>
-            {busy ? 'Zapisywanie…' : 'Zapisz klienta'}
-          </Button>
-        </div>
+          <Warnings items={saved?.duplicate_warnings} />
+          {saved && (
+            <Alert kind="success">
+              Kartoteka została zapisana.{' '}
+              <Link to={`/clients/${saved.id}`}>
+                Przejdź do klienta <ArrowUpRight size={14} />
+              </Link>
+            </Alert>
+          )}
+          {possible.length > 0 && !saved && (
+            <Alert kind="warning">
+              Sprawdź możliwe duplikaty:{' '}
+              {possible.slice(0, 3).map((client, index) => (
+                <span key={client.id}>
+                  {index ? ', ' : ''}
+                  <Link to={`/clients/${client.id}`}>{client.display_name}</Link>
+                </span>
+              ))}
+              . Wspólny kontakt ani podobna nazwa nie potwierdzają tożsamości. Kartoteki nie zostaną
+              automatycznie połączone.
+            </Alert>
+          )}
+          <h2>Dane podstawowe</h2>
+          <fieldset className="segmented">
+            <legend className="sr-only">Typ klienta</legend>
+            <label className={values.kind === 'person' ? 'selected' : ''}>
+              <input
+                type="radio"
+                name="kind"
+                value="person"
+                checked={values.kind === 'person'}
+                onChange={() => update('kind', 'person')}
+              />
+              <UserRound size={17} />
+              Osoba fizyczna
+            </label>
+            <label className={values.kind === 'organization' ? 'selected' : ''}>
+              <input
+                type="radio"
+                name="kind"
+                value="organization"
+                checked={values.kind === 'organization'}
+                onChange={() => update('kind', 'organization')}
+              />
+              <Building2 size={17} />
+              Organizacja
+            </label>
+          </fieldset>
+          <div className="form-grid">
+            {values.kind === 'person' ? (
+              <>
+                <FieldLabel label="Imię" required>
+                  <input
+                    required
+                    autoComplete="given-name"
+                    value={values.first_name}
+                    onChange={(event) => update('first_name', event.target.value)}
+                  />
+                </FieldLabel>
+                <FieldLabel label="Nazwisko" required>
+                  <input
+                    required
+                    autoComplete="family-name"
+                    value={values.last_name}
+                    onChange={(event) => update('last_name', event.target.value)}
+                  />
+                </FieldLabel>
+                <FieldLabel
+                  label="PESEL"
+                  hint="Opcjonalny identyfikator; przechowywany jako tekst."
+                >
+                  <input
+                    inputMode="numeric"
+                    value={values.pesel}
+                    onChange={(event) => update('pesel', event.target.value)}
+                  />
+                </FieldLabel>
+              </>
+            ) : (
+              <>
+                <FieldLabel label="Nazwa organizacji" required className="span-2">
+                  <input
+                    required
+                    value={values.organization_name}
+                    onChange={(event) => update('organization_name', event.target.value)}
+                  />
+                </FieldLabel>
+                <FieldLabel label="NIP" hint="Opcjonalny identyfikator; przechowywany jako tekst.">
+                  <input
+                    inputMode="numeric"
+                    value={values.nip}
+                    onChange={(event) => update('nip', event.target.value)}
+                  />
+                </FieldLabel>
+              </>
+            )}
+          </div>
+          <div className="form-divider" />
+          <h2>Kontakt i adres</h2>
+          <div className="form-grid">
+            <FieldLabel label="E-mail" hint="W demonstracji używaj domeny .invalid.">
+              <input
+                type="email"
+                autoComplete="email"
+                value={values.email}
+                onChange={(event) => update('email', event.target.value)}
+              />
+            </FieldLabel>
+            <FieldLabel label="Telefon">
+              <input
+                type="tel"
+                autoComplete="tel"
+                value={values.phone}
+                onChange={(event) => update('phone', event.target.value)}
+              />
+            </FieldLabel>
+            <FieldLabel label="Adres" className="span-2">
+              <textarea
+                rows={2}
+                value={values.address}
+                onChange={(event) => update('address', event.target.value)}
+              />
+            </FieldLabel>
+            <FieldLabel label="Notatka" className="span-2">
+              <textarea
+                rows={3}
+                value={values.note}
+                onChange={(event) => update('note', event.target.value)}
+              />
+            </FieldLabel>
+          </div>
+          <div className="form-actions">
+            <Link className="button secondary" to={initial ? `/clients/${initial.id}` : '/clients'}>
+              Anuluj
+            </Link>
+            <Button type="submit" disabled={busy || !!saved}>
+              {busy ? 'Zapisywanie…' : 'Zapisz klienta'}
+            </Button>
+          </div>
+        </fieldset>
       </form>
       {confirmReload && (
         <Modal title="Wczytać nowszą kartotekę?" onClose={() => setConfirmReload(false)}>
@@ -652,8 +661,12 @@ export function ClientPicker({
 }) {
   const [search, setSearch] = useState('');
   const query = useDebounce(search);
+  const exclusions = [...new Set(exclude)].sort((a, b) => a - b).join(',');
+  const filterKey = `${query}:${exclusions}`;
+  const [pagination, setPagination] = useState({ key: filterKey, page: 1 });
+  const page = pagination.key === filterKey ? pagination.page : 1;
   const resource = useApi<Page<Client>>(
-    `/api/clients/?${params({ search: query, archived: 'false' })}`,
+    `/api/clients/?${params({ search: query, archived: 'false', exclude: exclusions, page })}`,
   );
   return (
     <div className="client-picker">
@@ -666,28 +679,36 @@ export function ClientPicker({
           onChange={(event) => setSearch(event.target.value)}
         />
       </label>
-      {resource.error && <ErrorNotice error={resource.error} />}
+      {resource.error && <ErrorNotice error={resource.error} onReload={resource.reload} />}
       <div className="picker-results">
-        {resource.data?.results
-          .filter((client) => !exclude.includes(client.id))
-          .map((client) => (
-            <button
-              type="button"
-              className="picker-option"
-              key={client.id}
-              onClick={() => onSelect(client)}
-            >
-              <span>
-                {client.display_name}
-                <small>{client.email || client.phone || 'Brak danych kontaktowych'}</small>
-              </span>
-              <Plus size={16} />
-            </button>
-          ))}
+        {resource.data?.results.map((client) => (
+          <button
+            type="button"
+            className="picker-option"
+            key={client.id}
+            onClick={() => onSelect(client)}
+          >
+            <span>
+              {client.display_name}
+              <small>{client.email || client.phone || 'Brak danych kontaktowych'}</small>
+            </span>
+            <Plus size={16} />
+          </button>
+        ))}
         {resource.loading && !resource.data && <Loading />}
         {resource.data && !resource.data.results.length && <p>Nie znaleziono kartotek.</p>}
       </div>
-      <small>Wybierz istniejącą kartotekę. Możesz zawęzić wyniki wyszukiwaniem.</small>
+      {resource.data && (
+        <Pagination
+          data={resource.data}
+          page={page}
+          onPage={(value) => setPagination({ key: filterKey, page: value })}
+        />
+      )}
+      <small>
+        Wybierz istniejącą kartotekę. Wyszukiwanie i kolejne strony obejmują wszystkich dostępnych
+        klientów.
+      </small>
     </div>
   );
 }

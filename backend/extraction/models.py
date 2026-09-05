@@ -69,16 +69,19 @@ class EngineResult(ImmutableModel):
 
 class ReviewDraft(models.Model):
     document = models.OneToOneField("documents.Document", on_delete=models.PROTECT, related_name="draft")
-    engine_result = models.ForeignKey(EngineResult, on_delete=models.PROTECT)
+    engine_result = models.ForeignKey(EngineResult, on_delete=models.PROTECT, null=True)
     fields = models.JSONField(default=list)
     version = models.PositiveIntegerField(default=1)
     approved_version = models.PositiveIntegerField(null=True)
+    profile = models.CharField(max_length=100, default="broker_motor_application_v0")
+    origin = models.CharField(max_length=12, default="engine")
+    group_counters = models.JSONField(default=dict)
     updated_at = models.DateTimeField(auto_now=True)
 
 
 class ApprovedRevision(ImmutableModel):
     document = models.ForeignKey("documents.Document", on_delete=models.PROTECT, related_name="revisions")
-    engine_result = models.ForeignKey(EngineResult, on_delete=models.PROTECT)
+    engine_result = models.ForeignKey(EngineResult, on_delete=models.PROTECT, null=True)
     number = models.PositiveIntegerField()
     draft_version = models.PositiveIntegerField()
     fields = models.JSONField(default=list)
@@ -86,6 +89,8 @@ class ApprovedRevision(ImmutableModel):
     document_name = models.CharField(max_length=255)
     document_checksum = models.CharField(max_length=64)
     warnings = models.JSONField(default=list)
+    warning_confirmation = models.JSONField(default=dict)
+    origin = models.CharField(max_length=12, default="engine")
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
 

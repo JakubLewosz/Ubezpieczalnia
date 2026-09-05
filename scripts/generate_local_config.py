@@ -24,6 +24,9 @@ def main():
         "OCR_CONCURRENCY": "1",
         "VITE_API_PROXY_TARGET": "http://127.0.0.1:8000",
     }
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        for name in ("DJANGO_SECRET_KEY", "POSTGRES_PASSWORD"):
+            print("::add-mask::" + values[name], flush=True)
     try:
         descriptor = os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     except FileExistsError:

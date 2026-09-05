@@ -39,7 +39,10 @@ jobs:
       REDIS_URL: redis://127.0.0.1:6379/0
       E2E_BASE_URL: http://127.0.0.1:5173
       E2E_USERNAME: e2e.demo
+      E2E_SECOND_USERNAME: e2e.second
       OCR_CONCURRENCY: "1"
+      OCR_REQUIRED: "1"
+      PLAYWRIGHT_JSON_OUTPUT_NAME: ../.local/playwright-results.json
       VITE_API_PROXY_TARGET: http://127.0.0.1:8000
     steps:
       - uses: actions/checkout@v4
@@ -57,24 +60,31 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y tesseract-ocr tesseract-ocr-pol tesseract-ocr-eng fonts-dejavu-core
-          tesseract --list-langs
+          python scripts/check_ocr.py
       - name: Sekrety jednorazowej demonstracji
         run: |
           python - <<'PY'
           import os, secrets
           from pathlib import Path
+          values = {'DJANGO_SECRET_KEY': secrets.token_urlsafe(64),
+                    'E2E_PASSWORD': secrets.token_urlsafe(32), 'E2E_SECOND_PASSWORD': secrets.token_urlsafe(32)}
+          # Mask each value BEFORE writing GITHUB_ENV or using it in any later step.
+          for value in values.values():
+              print('::add-mask::' + value, flush=True)
           with open(os.environ['GITHUB_ENV'], 'a') as output:
-              output.write('DJANGO_SECRET_KEY=' + secrets.token_urlsafe(64) + '\n')
-              output.write('E2E_PASSWORD=' + secrets.token_urlsafe(32) + '\n')
+              for name, value in values.items():
+                  output.write(name + '=' + value + '\n')
           Path('.local').mkdir(exist_ok=True)
           PY
       - name: Instalacja z lockfile
         run: |
+          node --version
+          test "$(npm --version)" = "10.9.8"
           uv sync --project backend --frozen
           npm ci --prefix frontend
       - name: Backend i prawdziwy OCR
         run: |
-          uv run --project backend pytest backend/tests
+          uv run --project backend pytest backend/tests --junitxml=.local/pytest-results.xml
           uv run --project backend python backend/manage.py makemigrations --check --dry-run
           uv run --project backend ruff check backend scripts
       - name: Frontend
@@ -91,6 +101,9 @@ jobs:
           subprocess.run([sys.executable, 'backend/manage.py', 'seed_demo', '--username', os.environ['E2E_USERNAME'],
               '--role', 'EMPLOYEE', '--password-stdin', '--without-documents'],
               input=os.environ['E2E_PASSWORD'] + '\n', text=True, check=True)
+          subprocess.run([sys.executable, 'backend/manage.py', 'seed_demo', '--username', os.environ['E2E_SECOND_USERNAME'],
+              '--role', 'EMPLOYEE', '--password-stdin', '--without-documents'],
+              input=os.environ['E2E_SECOND_PASSWORD'] + '\n', text=True, check=True)
           PY
       - name: Uruchomienie aplikacji
         run: |
@@ -111,8 +124,39 @@ jobs:
         working-directory: frontend
         run: |
           npx playwright install --with-deps chromium
-          npm run test:e2e
+          npm run test:e2e -- --reporter=line,json
+      - name: Diagnostyka bez sekretów i treści żądań
+        if: always()
+        run: python scripts/collect_ci_diagnostics.py
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: synthetic-test-summary
+          path: .local/ci-diagnostics/test-summary.json
+          retention-days: 7
+          if-no-files-found: ignore
       - name: Zatrzymaj procesy
         if: always()
         run: |
           if [ -f .local/dev.pid ]; then kill "$(cat .local/dev.pid)" || true; fi
+  compose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Czyste obrazy, wolumeny, migracje i uruchomienie Compose
+        run: python3 scripts/verify_compose.py --port 5174
+      - name: Zatrzymaj wyłącznie projekt weryfikacyjny
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          for result in Path('.local/compose-checks').glob('broker-check-*/result.json'):
+              data = json.loads(result.read_text())
+              if not data['project'].startswith('broker-check-'):
+                  raise SystemExit('Nieprawidłowa nazwa projektu weryfikacyjnego.')
+              env = {**os.environ, 'BROKER_ENV_FILE': data['environment_file'], 'BROKER_HTTP_PORT': str(data['port'])}
+              subprocess.run(['docker', 'compose', '--project-name', data['project'],
+                  '--env-file', data['environment_file'], 'down'], env=env, check=True)
+          PY

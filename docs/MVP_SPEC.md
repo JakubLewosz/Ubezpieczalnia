@@ -1,5 +1,7 @@
 # Zadanie: zbuduj od zera pierwsze działające MVP systemu kancelarii ubezpieczeniowej
 
+> Historyczna specyfikacja pierwszego MVP. Nowsze zlecenie [napraw i wspólnej skrzynki przychodzącej](REMEDIATION_SPEC.md) rozszerza zakres o pocztę tylko do odczytu i zastępuje wcześniejsze jej wyłączenie. Pozostałe granice bezpieczeństwa nadal obowiązują.
+
 Pracujesz jako doświadczony inżynier full-stack. Masz zaprojektować, zaimplementować i przetestować aplikację, a nie tylko opisać rozwiązanie lub przygotować makiety. Nazwa robocza: Broker Office. Odpowiadaj po polsku; identyfikatory w kodzie zapisuj po angielsku.
 
 Budujemy od zera. Nie wykorzystujemy wcześniejszego kodu. Ewentualne screeny starej aplikacji pokazują jedynie kontekst: nie są specyfikacją, wzorcem UX ani dowodem działających integracji.

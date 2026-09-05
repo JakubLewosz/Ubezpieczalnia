@@ -11,6 +11,7 @@ RUN uv sync --project backend --frozen --no-dev
 COPY --chown=broker:broker backend ./backend
 COPY --chown=broker:broker scripts ./scripts
 COPY --chown=broker:broker fixtures ./fixtures
+RUN python scripts/check_ocr.py
 RUN mkdir -p /app/.local/media && chown -R broker:broker /app/.local
 USER broker
 ENV PATH="/app/backend/.venv/bin:$PATH" PYTHONPATH=/app/backend

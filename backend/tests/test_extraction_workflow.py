@@ -17,6 +17,15 @@ from extraction.engine import BrokerMotorEngine, PageText
 from extraction.models import ApprovedRevision, EngineResult, ExtractionJob, ReviewDraft
 from extraction.tasks import process_document, recover_stale_jobs
 
+def approval(api, document_id, version):
+    review = api.get(f"/api/documents/{document_id}/review/").data
+    draft = review.get("draft")
+    return api.post(f"/api/documents/{document_id}/approve/", {
+        "version": version, "warning_digest": draft["warning_digest"] if draft else "",
+        "confirm_warnings": True, "note": "DANE TESTOWE: zweryfikowano źródło i kontrolowane braki.",
+    }, format="json")
+
+
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "synthetic"
 
 
@@ -69,10 +78,10 @@ def test_manual_correction_approval_export_and_reread_never_replace_snapshots(ex
     extraction_result.refresh_from_db()
     assert extraction_result.fields == original
     assert extraction_api.patch(f"/api/documents/{document_id}/review/", {"version": 1, "fields": fields}, format="json").status_code == 409
-    response = extraction_api.post(f"/api/documents/{document_id}/approve/", {"version": 2}, format="json")
+    response = approval(extraction_api, document_id, 2)
     assert response.status_code == 201, response.data
     revision_id = response.data["id"]
-    assert extraction_api.post(f"/api/documents/{document_id}/approve/", {"version": 2}, format="json").status_code == 409
+    assert approval(extraction_api, document_id, 2).status_code == 409
     snapshot = ApprovedRevision.objects.get(pk=revision_id)
     assert snapshot.fields[0]["value"] == "000001-DANE TESTOWE"
     job = ExtractionJob.objects.create(document=extraction_document, requested_by=extraction_user)
@@ -88,7 +97,7 @@ def test_manual_correction_approval_export_and_reread_never_replace_snapshots(ex
     assert reset.status_code == 200 and reset.data["version"] == 3
     snapshot.refresh_from_db()
     assert snapshot.fields[0]["value"] == "000001-DANE TESTOWE"
-    assert extraction_api.post(f"/api/documents/{document_id}/approve/", {"version": 3}, format="json").status_code == 201
+    assert approval(extraction_api, document_id, 3).status_code == 201
     assert ApprovedRevision.objects.count() == 2
 
 
@@ -120,7 +129,7 @@ def test_field_identity_and_types_cannot_be_spoofed(extraction_document, extract
 
 @pytest.mark.django_db
 def test_immutable_models_reject_edits_and_deletes(extraction_result, extraction_document, extraction_api):
-    approved = extraction_api.post(f"/api/documents/{extraction_document.pk}/approve/", {"version": 1}, format="json")
+    approved = approval(extraction_api, extraction_document.pk, 1)
     revision = ApprovedRevision.objects.get(pk=approved.data["id"])
     for model in [extraction_result, revision]:
         with pytest.raises(ValueError, match="niezmienny"):
@@ -170,7 +179,7 @@ def test_unsupported_job_is_technical_success_without_approvable_draft(extractio
     job.refresh_from_db()
     assert job.status == "succeeded" and job.result.profile is None
     assert not ReviewDraft.objects.filter(document=extraction_document).exists()
-    assert extraction_api.post(f"/api/documents/{extraction_document.pk}/approve/", {"version": 1}, format="json").status_code == 404
+    assert approval(extraction_api, extraction_document.pk, 1).status_code == 404
 
 
 @pytest.mark.django_db(transaction=True)
@@ -185,7 +194,7 @@ def test_two_simultaneous_approvals_create_only_one_revision(extraction_document
         api.force_authenticate(extraction_user)
         barrier.wait(timeout=5)
         try:
-            return api.post(f"/api/documents/{extraction_document.pk}/approve/", {"version": 1}, format="json").status_code
+            return approval(api, extraction_document.pk, 1).status_code
         finally:
             close_old_connections()
     with ThreadPoolExecutor(max_workers=2) as executor:

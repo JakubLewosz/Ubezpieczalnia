@@ -1,0 +1,13 @@
+{
+  "numbered": {
+    "application.0.application_number": "TEST/2026/001", "application.0.document_date": "2026-08-27",
+    "participants.0.role": "policyholder,insured", "participants.0.name": "Anna Demonstracyjna", "participants.0.phone": "000 000 000", "participants.0.address": "00-000 Miejscowość Testowa, ul. Testowa 1", "participants.0.pesel": null,
+    "vehicle.0.make": "MarkaTestowa", "vehicle.0.model": "ModelTestowy", "vehicle.0.registration": "DEMO001", "vehicle.0.vin": "TEST1234567890123", "vehicle.0.year": "2020", "vehicle.0.seats": "5",
+    "coverage.0.start_date": "2026-09-04", "coverage.0.end_date": "2027-09-03", "coverage.0.insured_sum": null, "coverage.0.premium": null,
+    "coverage_items.0.requested_scope": "OC", "coverage_items.0.variant": "ustawowe minimalne sumy gwarancyjne", "coverage_items.0.insured_sum": null,
+    "coverage_items.1.requested_scope": "NNW", "coverage_items.1.insured_sum": "10000", "coverage_items.2.requested_scope": "Assistance", "coverage_items.2.variant": "wariant POLSKA podstawowy",
+    "previous.0.insurer": "Ubezpieczyciel Testowy", "previous.0.policy_number": "000123", "payment.0.payment_method": "jednorazowo przelewem"
+  },
+  "variant": {"application.0.application_number": "TEST/2026/002", "application.0.document_date": "2026-08-28", "participants.0.name": "Bruno Przykładowy", "participants.0.role": "policyholder,insured", "participants.0.email": "bruno@broker-demo.invalid", "participants.0.phone": "000-000-001", "participants.0.pesel": null, "vehicle.0.registration": "DEMO002", "vehicle.0.make": "MarkaTestowa", "vehicle.0.model": "ModelTestowy", "vehicle.0.year": "2021", "vehicle.0.vin": "TEST1234567890124", "coverage.0.start_date": "2026-09-05", "coverage.0.end_date": "2027-09-04", "coverage_items.1.insured_sum": "15000.50", "previous.0.policy_number": "000124", "payment.0.payment_method": "jednorazowo przelewem"},
+  "holdout": {"application.0.application_number": "TEST/2026/HOLDOUT", "application.0.document_date": "2026-08-30", "participants.0.name": "Celina Fikcyjna", "participants.0.role": "policyholder,insured", "participants.0.phone": "000 000 002", "vehicle.0.model": "ModelPróbny", "vehicle.0.registration": "DEMO003", "vehicle.0.vin": "TEST1234567890125", "vehicle.0.year": "2022", "vehicle.0.seats": "7", "coverage.0.start_date": "2026-09-06", "coverage.0.end_date": "2027-09-05", "coverage_items.1.insured_sum": "20000.75", "coverage_items.2.variant": "wariant EUROPA", "previous.0.policy_number": "000125", "payment.0.payment_method": "dwie raty przelewem"}
+}

@@ -68,7 +68,11 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     const body: unknown = await response.json().catch(() => null);
     throw new ApiError(
       response.status,
-      body ? describeError(body) : `Serwer zwrócił błąd ${response.status}. Spróbuj ponownie.`,
+      response.status === 403
+        ? `Sesja wygasła lub brak uprawnień. Zachowaj niezapisane zmiany przed ponownym logowaniem. ${body ? describeError(body) : ''}`
+        : body
+          ? describeError(body)
+          : `Serwer zwrócił błąd ${response.status}. Spróbuj ponownie.`,
     );
   }
   if (response.status === 204) return undefined as T;

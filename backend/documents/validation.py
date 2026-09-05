@@ -1,5 +1,4 @@
 import hashlib
-import re
 import warnings
 import zipfile
 from pathlib import Path
@@ -7,6 +6,7 @@ from django.conf import settings
 from PIL import Image
 from pypdf import PdfReader
 from rest_framework.exceptions import ValidationError
+from exports.text import ExportValidationError, validate_xlsx_text
 
 MIMES = {
     ".pdf": "application/pdf",
@@ -19,7 +19,13 @@ MIMES = {
 
 
 def inspect_upload(upload):
-    original = re.sub(r"[\x00-\x1f\x7f]", "", upload.name.replace("\\", "/").split("/")[-1])[:255]
+    original = upload.name.replace("\\", "/").split("/")[-1]
+    try:
+        validate_xlsx_text(original, "Nazwa pliku")
+    except ExportValidationError as error:
+        raise ValidationError({"file": str(error)}) from None
+    if len(original) > 255:
+        raise ValidationError({"file": "Nazwa pliku przekracza 255 znaków. Skróć ją jawnie przed uploadem."})
     extension = Path(original).suffix.lower()
     if extension not in MIMES:
         raise ValidationError({"file": "Dozwolone są PDF, JPEG, PNG oraz załączniki DOCX i XLSX."})

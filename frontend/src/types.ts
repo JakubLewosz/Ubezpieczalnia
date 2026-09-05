@@ -84,6 +84,7 @@ export interface Field {
   type: 'text' | 'date' | 'decimal' | 'integer';
   unit: string;
   group: string;
+  group_id?: string;
   index: number;
   page: number | null;
   source: string;
@@ -101,7 +102,18 @@ export interface EngineResult {
   warnings: string[];
   pages: { number: number; method: 'text' | 'ocr' }[];
 }
+export interface DraftWarning {
+  id: string;
+  field: string | null;
+  code: string;
+  message: string;
+  requires_note: boolean;
+}
 export interface Draft {
+  profile?: string;
+  origin?: 'engine' | 'manual';
+  warnings?: DraftWarning[];
+  warning_digest?: string;
   id: number;
   version: number;
   fields: Field[];

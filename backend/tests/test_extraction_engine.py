@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -24,9 +25,13 @@ def synthetic_document(name):
 
 def require_tesseract():
     if not shutil.which("tesseract"):
+        if os.environ.get("OCR_REQUIRED") == "1":
+            pytest.fail("Brak obowiązkowego OCR: Tesseract i języki pol+eng.")
         pytest.skip("Prawdziwy OCR wymaga lokalnego Tesseract; obowiązkowy w jobie CI OCR.")
     result = subprocess.run(["tesseract", "--list-langs"], capture_output=True, text=True, check=True)
     if not {"pol", "eng"}.issubset(set(result.stdout.split())):
+        if os.environ.get("OCR_REQUIRED") == "1":
+            pytest.fail("Brak obowiązkowego OCR: Tesseract i języki pol+eng.")
         pytest.skip("Prawdziwy OCR wymaga języków pol+eng; obowiązkowe w jobie CI OCR.")
 
 

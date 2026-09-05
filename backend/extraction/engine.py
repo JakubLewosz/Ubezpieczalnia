@@ -93,6 +93,8 @@ def typed_value(value: str, field_type: str) -> str | None:
     if field_type == "decimal":
         value = re.sub(r"\s*(PLN|zł|zl)\s*$", "", value, flags=re.I)
         value = value.replace(" ", "").replace("\u00a0", "")
+        if re.fullmatch(r"\d{1,3}(?:\.\d{3})+", value):
+            value = value.replace(".", "")
         if "," in value:
             value = value.replace(".", "").replace(",", ".")
         if not re.fullmatch(r"\d{1,12}(?:\.\d{1,2})?", value):
@@ -118,6 +120,10 @@ class BrokerMotorEngine:
     def extract(self, pages: list[PageText]) -> dict:
         if sum(len(page.text.encode("utf-8")) for page in pages) > MAX_TEXT_BYTES:
             raise ExtractionLimitError("Łączna treść dokumentu przekracza limit odczytu 1 MiB.")
+        from .numbered import extract_numbered
+        numbered = extract_numbered(pages)
+        if numbered is not None:
+            return numbered
         all_text = normalized("\n".join(page.text for page in pages))
         page_info = [{"number": page.number, "method": page.method} for page in pages]
         # Positive application wording must occur together on one line. An unrelated
@@ -127,6 +133,8 @@ class BrokerMotorEngine:
             r"wniosek[ \t]+(?:brokerski[ \t]+)?(?:ubezpieczenia[ \t]+)?komunikacyjn\w*\b",
             all_text, flags=re.M,
         ))
+        if re.search(r"^(?:od|from|temat|subject|do|to):", all_text, flags=re.M):
+            is_profile = False
         if not is_profile:
             return {"profile": None, "fields": [], "warnings": ["Brak profilu automatycznego odczytu"], "pages": page_info}
 
@@ -146,7 +154,7 @@ class BrokerMotorEngine:
         next_scope_index = 0
         role_expression = re.compile(
             r"^(?:(?:uczestnik|osoba)\s*\d*\s*[-—–:|]?\s*)?"
-            r"(ubezpieczajacy|ubezpieczony|ubezpieczeni|wlasciciel)\s*(?:\d+)?\s*(?::|=|\||[-—–])?\s*(.*)$"
+            r"((?:ubezpieczajacy|ubezpieczony|ubezpieczeni|wlasciciel)(?:\s*/\s*(?:ubezpieczajacy|ubezpieczony|ubezpieczeni|wlasciciel))*)\s*(?:\d+)?\s*(?::|=|\||[-—–])?\s*(.*)$"
         )
 
         def participant(index):
@@ -160,6 +168,7 @@ class BrokerMotorEngine:
                 if field["value"] is not None and field["value"] != value:
                     field.update(value=None, warnings=["Sprzeczne wartości; sprawdź dokument ręcznie."], source="", page=None)
                     field["ambiguous"] = True
+                    field["source_conflict"] = True
                     return
                 if field.get("ambiguous"):
                     return
@@ -181,7 +190,9 @@ class BrokerMotorEngine:
                         if current_participant >= MAX_PARTICIPANTS:
                             raise ExtractionLimitError("Dokument przekracza limit 100 uczestników profilu pilotażowego.")
                         participant(current_participant)
-                        role_name = {"ubezpieczajacy": "policyholder", "ubezpieczony": "insured", "ubezpieczeni": "insured", "wlasciciel": "owner"}[role_match.group(1)]
+                        role_map = {"ubezpieczajacy": "policyholder", "ubezpieczony": "insured", "ubezpieczeni": "insured", "wlasciciel": "owner"}
+                        roles = {role_map[part.strip()] for part in role_match.group(1).split("/")}
+                        role_name = ",".join(role for role in ["policyholder", "insured", "owner"] if role in roles)
                         set_value(("participants", current_participant, "role"), role_name, page, line)
                         # Positions in NFKD-normalized Polish are stable after combining marks removed.
                         raw_name = line.strip()[role_match.start(2):].strip()
@@ -211,7 +222,11 @@ class BrokerMotorEngine:
                         break
         if current_participant < 0:
             participant(0)
+        import uuid
+        group_ids = {}
         result_fields = list(fields.values())
+        for field in result_fields:
+            field["group_id"] = group_ids.setdefault((field["group"], field["index"]), str(uuid.uuid4()))
         for field in result_fields:
             field.pop("ambiguous", None)
             if field["value"] and field["method"] == "ocr":

@@ -50,7 +50,7 @@ def process_document(job_id):
             result = EngineResult.objects.create(job=locked, **parsed)
             if result.profile:
                 ReviewDraft.objects.get_or_create(
-                    document=job.document, defaults={"engine_result": result, "fields": result.fields}
+                    document=job.document, defaults={"engine_result": result, "fields": result.fields, "profile": result.profile}
                 )
             locked.status = "succeeded"
             locked.finished_at = timezone.now()

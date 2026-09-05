@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import path from 'node:path';
+import { acknowledgeWarnings } from './helpers';
 
 test('logowanie → klient → dokument → lokalny odczyt → korekta → zatwierdzenie → XLSX', async ({
   page,
@@ -50,6 +51,7 @@ test('logowanie → klient → dokument → lokalny odczyt → korekta → zatwi
   await page.getByRole('button', { name: 'Zapisz wersję roboczą', exact: true }).click();
   await expect(page.getByText('Wersja robocza została zapisana.')).toBeVisible();
   await page.getByRole('button', { name: 'Zatwierdź wersję', exact: true }).click();
+  await acknowledgeWarnings(page);
   await page.getByRole('button', { name: 'Potwierdź zatwierdzenie', exact: true }).click();
   await expect(page.getByText('Rewizja 1', { exact: true })).toBeVisible();
   const downloadEvent = page.waitForEvent('download');

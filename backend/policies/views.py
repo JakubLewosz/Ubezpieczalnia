@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from common.api import Conflict
 from common.audit import record
 from common.normalization import normalize
+from common.query import positive_ids
 from .models import Policy
 from .serializers import PolicySerializer
 
@@ -26,18 +27,20 @@ class PolicyViewSet(viewsets.ModelViewSet):
             archived = self.request.query_params.get("archived", "false")
             if archived != "all":
                 qs = qs.filter(archived=archived == "true")
-        client = self.request.query_params.get("client")
-        if client:
-            if not client.isdigit():
-                raise ValidationError("Nieprawidłowa kartoteka.")
-            qs = qs.filter(participants__client_id=client).distinct()
+        clients = positive_ids(self.request.query_params.get("client"), "client", limit=1)
+        if clients:
+            qs = qs.filter(participants__client_id=clients[0]).distinct()
         days = self.request.query_params.get("expires_in")
         if days:
             if not days.isdigit() or not 0 <= int(days) <= 365:
                 raise ValidationError("Zakres terminów musi wynosić 0–365 dni.")
             qs = expiring(qs, int(days))
         search = normalize(self.request.query_params.get("search", ""))
-        return qs.filter(search_text__contains=search) if search else qs
+        if search:
+            qs = qs.filter(search_text__contains=search)
+        ordering = self.request.query_params.get("ordering", "end_date")
+        return qs.order_by(ordering if ordering in {"end_date", "-end_date", "number", "-number"}
+                           else "end_date", "id")
 
     def perform_create(self, serializer):
         with transaction.atomic():

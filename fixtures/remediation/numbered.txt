@@ -1,0 +1,18 @@
+DANE TESTOWE
+Białystok, 2026-08-27
+Wniosek brokerski nr TEST/2026/001
+(zapytanie ofertowe)
+1. Ubezpieczający/ Ubezpieczony:
+Anna Demonstracyjna, 00-000 Miejscowość Testowa, ul. Testowa 1.
+PESEL: nie podano. Tel. 000 000 000
+2. Przedmiot ubezpieczenia:
+samochód osobowy MarkaTestowa ModelTestowy, nr rej. DEMO001,
+rok prod. 2020, nr VIN: TEST1234567890123, liczba miejsc 5.
+3. Rodzaj, zakres i suma ubezpieczenia:
+a) OC – ustawowe minimalne sumy gwarancyjne
+b) NNW – 10.000 Pln
+c) Assistance – wariant POLSKA podstawowy
+4. Okres ubezpieczenia: 04.09.2026 – 03.09.2027.
+5. Informacje o kliencie i inne:
+a) ostatni Ubezpieczyciel: Ubezpieczyciel Testowy (polisa 000123)
+6. Warunki płatności: jednorazowo przelewem.

@@ -108,3 +108,29 @@ def test_failed_database_insert_removes_private_original(api, customer, settings
         with pytest.raises(RuntimeError):
             upload(api, customer, "failed.pdf", pdf())
     assert not any(path.is_file() for path in settings.MEDIA_ROOT.rglob("*"))
+
+
+def test_invalid_filename_character_is_rejected_without_silent_cleanup(api, customer):
+    from documents.validation import inspect_upload
+    from rest_framework.exceptions import ValidationError
+
+    response = upload(api, customer, "DANE TESTOWE\x01.pdf", pdf())
+    assert response.status_code == 400 and "U+0001" in str(response.data)
+    assert not Document.objects.exists()
+    # Validate direct promotion too; it does not go through multipart parsing.
+    with pytest.raises(ValidationError, match="U\\+0001"):
+        inspect_upload(SimpleUploadedFile("DANE TESTOWE\x01.pdf", pdf()))
+
+
+def test_archived_policy_cannot_be_selected_for_upload(api, customer):
+    from datetime import date
+    from policies.models import Policy, PolicyParticipant
+
+    policy = Policy.objects.create(insurer="DANE TESTOWE", number="TEST-ARCHIVE",
+                                   insurance_type="komunikacyjne", start_date=date(2026, 1, 1),
+                                   end_date=date(2027, 1, 1), archived=True)
+    PolicyParticipant.objects.create(policy=policy, client=customer, role="insured")
+    response = api.post("/api/documents/", {"client": customer.pk, "policy": policy.pk,
+                        "category": "DANE TESTOWE", "file": SimpleUploadedFile("test.pdf", pdf())},
+                        format="multipart")
+    assert response.status_code == 400 and not Document.objects.exists()

@@ -22,7 +22,8 @@ import {
 } from 'lucide-react';
 import { api, dateTime, params, patch, post } from './api';
 import { ClientPicker } from './clients';
-import { useApi, useDebounce } from './hooks';
+import { PolicyPicker } from './policies';
+import { useApi, useDebounce, useMounted } from './hooks';
 import type {
   Client,
   DocumentRecord,
@@ -113,22 +114,21 @@ export function UploadPage() {
   const clientResource = useApi<Client>(id ? `/api/clients/${id}/` : null);
   if (id && !clientResource.data)
     return clientResource.error ? <ErrorNotice error={clientResource.error} /> : <Loading />;
-  return <UploadForm initialClient={clientResource.data} />;
+  return <UploadForm key={id ?? 'new'} initialClient={clientResource.data} />;
 }
 function UploadForm({ initialClient }: { initialClient: Client | null }) {
   const navigate = useNavigate();
+  const mounted = useMounted();
   const [client, setClient] = useState(initialClient),
     [file, setFile] = useState<File | null>(null),
     [category, setCategory] = useState('Wniosek brokerski'),
-    [policy, setPolicy] = useState(''),
+    [policy, setPolicy] = useState<Policy | null>(null),
     [error, setError] = useState<unknown>(null),
     [busy, setBusy] = useState(false),
     [dirty, setDirty] = useState(false);
-  const policies = useApi<Page<Policy>>(
-    client ? `/api/policies/?client=${client.id}&archived=all` : null,
-  );
   async function upload(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
     if (!client || !file) {
       setError(new Error('Wybierz klienta i plik dokumentu.'));
       return;
@@ -143,10 +143,14 @@ function UploadForm({ initialClient }: { initialClient: Client | null }) {
       const form = new FormData();
       form.set('client', String(client.id));
       form.set('category', category);
-      if (policy) form.set('policy', policy);
+      if (policy) form.set('policy', String(policy.id));
       form.set('file', file);
       const document = await api<DocumentRecord>('/api/documents/', { method: 'POST', body: form });
-      flushSync(() => setDirty(false));
+      if (!mounted.current) return;
+      flushSync(() => {
+        setBusy(false);
+        setDirty(false);
+      });
       void navigate(`/documents/${document.id}`);
     } catch (failure) {
       setError(failure);
@@ -156,7 +160,7 @@ function UploadForm({ initialClient }: { initialClient: Client | null }) {
   }
   return (
     <>
-      <UnsavedGuard dirty={dirty} />
+      <UnsavedGuard dirty={dirty || !!busy} />
       <PageHeading
         title="Dodaj dokument"
         description="Oryginał zostanie zapisany w prywatnym magazynie kancelarii."
@@ -166,114 +170,111 @@ function UploadForm({ initialClient }: { initialClient: Client | null }) {
         }}
       />
       <form onSubmit={upload} className="panel form-panel upload-form">
-        {!!error && <ErrorNotice error={error} />}
-        <h2>Powiązanie z klientem</h2>
-        {client ? (
-          <div className="selected-client">
-            <div className="avatar">
-              <FileText size={20} />
+        <fieldset disabled={busy} className="form-lock">
+          {!!error && <ErrorNotice error={error} />}
+          <h2>Powiązanie z klientem</h2>
+          {client ? (
+            <div className="selected-client">
+              <div className="avatar">
+                <FileText size={20} />
+              </div>
+              <span>
+                <strong>{client.display_name}</strong>
+                <small>Główna kartoteka dokumentu</small>
+              </span>
+              {!initialClient && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setClient(null);
+                    setPolicy(null);
+                    setDirty(true);
+                  }}
+                  aria-label="Zmień klienta"
+                >
+                  <X size={17} />
+                </Button>
+              )}
             </div>
-            <span>
-              <strong>{client.display_name}</strong>
-              <small>Główna kartoteka dokumentu</small>
-            </span>
-            {!initialClient && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setClient(null);
-                  setPolicy('');
+          ) : (
+            <ClientPicker
+              onSelect={(selected) => {
+                setClient(selected);
+                setDirty(true);
+              }}
+            />
+          )}
+          <div className="form-grid">
+            <FieldLabel label="Kategoria" required>
+              <select
+                value={category}
+                onChange={(event) => {
+                  setCategory(event.target.value);
+                  setDirty(true);
                 }}
-                aria-label="Zmień klienta"
               >
-                <X size={17} />
-              </Button>
+                <option>Wniosek brokerski</option>
+                <option>Polisa</option>
+                <option>Aneks</option>
+                <option>Załącznik</option>
+                <option>Inny dokument</option>
+              </select>
+            </FieldLabel>
+            {client && (
+              <PolicyPicker
+                key={client.id}
+                clientId={client.id}
+                selected={policy}
+                onSelect={(value) => {
+                  setPolicy(value);
+                  setDirty(true);
+                }}
+              />
             )}
           </div>
-        ) : (
-          <ClientPicker
-            onSelect={(selected) => {
-              setClient(selected);
-              setDirty(true);
-            }}
-          />
-        )}
-        <div className="form-grid">
-          <FieldLabel label="Kategoria" required>
-            <select
-              value={category}
+          <div className="form-divider" />
+          <h2>Plik dokumentu</h2>
+          <label className={`upload-zone ${file ? 'has-file' : ''}`}>
+            <UploadCloud size={34} strokeWidth={1.5} />
+            <strong>{file ? file.name : 'Wybierz plik z komputera'}</strong>
+            <span>
+              {file
+                ? `${(file.size / 1024 / 1024).toFixed(2)} MB · kliknij, aby zmienić`
+                : 'PDF, JPEG, PNG, DOCX lub XLSX'}
+            </span>
+            <input
+              type="file"
+              aria-label="Plik dokumentu"
+              accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
+              required
               onChange={(event) => {
-                setCategory(event.target.value);
+                setFile(event.target.files?.[0] ?? null);
                 setDirty(true);
               }}
+            />
+          </label>
+          <p className="muted">
+            Limity demonstracyjne: 20 MB i 30 stron. PDF i obrazy mogą zostać odczytane lokalnie.
+            DOCX i XLSX są przechowywane jako załączniki.
+          </p>
+          <Alert kind="info">
+            Automatyczny profil obejmuje wniosek brokerski komunikacyjny. Odczyt wymaga sprawdzenia
+            przez pracownika.
+          </Alert>
+          <div className="form-actions">
+            <Link
+              className="button secondary"
+              to={initialClient ? `/clients/${initialClient.id}` : '/documents'}
             >
-              <option>Wniosek brokerski</option>
-              <option>Polisa</option>
-              <option>Aneks</option>
-              <option>Załącznik</option>
-              <option>Inny dokument</option>
-            </select>
-          </FieldLabel>
-          <FieldLabel label="Powiązana polisa" hint="Opcjonalnie; polisa musi być już zapisana.">
-            <select
-              value={policy}
-              disabled={!client}
-              onChange={(event) => {
-                setPolicy(event.target.value);
-                setDirty(true);
-              }}
-            >
-              <option value="">Bez powiązania z polisą</option>
-              {policies.data?.results.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.number} · {item.insurer}
-                </option>
-              ))}
-            </select>
-          </FieldLabel>
-        </div>
-        <div className="form-divider" />
-        <h2>Plik dokumentu</h2>
-        <label className={`upload-zone ${file ? 'has-file' : ''}`}>
-          <UploadCloud size={34} strokeWidth={1.5} />
-          <strong>{file ? file.name : 'Wybierz plik z komputera'}</strong>
-          <span>
-            {file
-              ? `${(file.size / 1024 / 1024).toFixed(2)} MB · kliknij, aby zmienić`
-              : 'PDF, JPEG, PNG, DOCX lub XLSX'}
-          </span>
-          <input
-            type="file"
-            aria-label="Plik dokumentu"
-            accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
-            required
-            onChange={(event) => {
-              setFile(event.target.files?.[0] ?? null);
-              setDirty(true);
-            }}
-          />
-        </label>
-        <p className="muted">
-          Limity demonstracyjne: 20 MB i 30 stron. PDF i obrazy mogą zostać odczytane lokalnie. DOCX
-          i XLSX są przechowywane jako załączniki.
-        </p>
-        <Alert kind="info">
-          Automatyczny profil obejmuje wniosek brokerski komunikacyjny. Odczyt wymaga sprawdzenia
-          przez pracownika.
-        </Alert>
-        <div className="form-actions">
-          <Link
-            className="button secondary"
-            to={initialClient ? `/clients/${initialClient.id}` : '/documents'}
-          >
-            Anuluj
-          </Link>
-          <Button type="submit" disabled={busy || !client || !file}>
-            <UploadCloud size={17} />
-            {busy ? 'Wgrywanie…' : 'Wgraj dokument'}
-          </Button>
-        </div>
+              Anuluj
+            </Link>
+            <Button type="submit" disabled={busy || !client || !file}>
+              <UploadCloud size={17} />
+              {busy ? 'Wgrywanie…' : 'Wgraj dokument'}
+            </Button>
+          </div>
+        </fieldset>
       </form>
     </>
   );
@@ -306,12 +307,13 @@ const groupLabels: Record<string, string> = {
   application: 'Wniosek',
   participants: 'Uczestnicy ubezpieczenia',
   vehicle: 'Pojazd',
-  coverage: 'Wnioskowana ochrona',
+  coverage: 'Okres i wartości ogólne',
+  coverage_items: 'Wnioskowane elementy ochrony',
   previous: 'Poprzednie ubezpieczenie',
   payment: 'Płatność',
 };
-export const fieldKey = (field: Pick<Field, 'group' | 'index' | 'code'>) =>
-  `${field.group}:${field.index}:${field.code}`;
+export const fieldKey = (field: Pick<Field, 'group' | 'group_id' | 'index' | 'code'>) =>
+  `${field.group_id ?? `${field.group}:${field.index}`}:${field.code}`;
 export function groupFields(fields: Field[]): [string, Field[]][] {
   const groups = new Map<string, Field[]>();
   fields.forEach((field) => {
@@ -333,7 +335,7 @@ export function updateField(
 ): Field[] {
   return fields.map((field) => (fieldKey(field) === key ? { ...field, ...change } : field));
 }
-function ReviewWorkspace({
+export function ReviewWorkspace({
   document,
   review,
   refresh,
@@ -344,6 +346,7 @@ function ReviewWorkspace({
   refresh: () => void;
   networkError: string;
 }) {
+  const mounted = useMounted();
   const [draft, setDraft] = useState<Draft | null>(review.draft),
     [fields, setFields] = useState<Field[]>(review.draft?.fields ?? []),
     [dirty, setDirty] = useState(false),
@@ -353,14 +356,25 @@ function ReviewWorkspace({
     [busy, setBusy] = useState(''),
     [error, setError] = useState<unknown>(null),
     [notice, setNotice] = useState(''),
-    [confirm, setConfirm] = useState<'approve' | 'reset' | 'reread' | 'reload' | null>(null),
+    [confirm, setConfirm] = useState<'approve' | 'reset' | 'reread' | 'reload' | 'manual' | null>(
+      null,
+    ),
+    [warningAcknowledged, setWarningAcknowledged] = useState(false),
+    [approvalNote, setApprovalNote] = useState(''),
+    [removeGroup, setRemoveGroup] = useState<{ id: string; label: string } | null>(null),
     [selectedRevision, setSelectedRevision] = useState<Revision | null>(null);
   useEffect(() => {
-    if (!dirty && review.draft && review.draft.version >= (draft?.version ?? 0)) {
+    if (
+      !dirty &&
+      !busy &&
+      !confirm &&
+      review.draft &&
+      review.draft.version >= (draft?.version ?? 0)
+    ) {
       setDraft(review.draft);
       setFields(review.draft.fields);
     }
-  }, [review.draft, dirty, draft?.version]);
+  }, [review.draft, dirty, busy, confirm, draft?.version]);
   useEffect(() => setPreviewError(false), [page, document.page_count, review.job?.status]);
   const job = review.job ?? document.latest_job;
   const running = job?.status === 'queued' || job?.status === 'running';
@@ -376,12 +390,15 @@ function ReviewWorkspace({
         draft?.fields.find((original) => fieldKey(original) === fieldKey(field))?.absent,
   ).length;
   function changeField(field: Field, change: Pick<Partial<Field>, 'value' | 'absent'>) {
+    if (busy) return;
     setFields((current) => updateField(current, fieldKey(field), change));
+    setWarningAcknowledged(false);
+    setApprovalNote('');
     setDirty(true);
     setNotice('');
   }
   async function save() {
-    if (!draft) return;
+    if (!draft || busy) return;
     setBusy('save');
     setError(null);
     try {
@@ -389,10 +406,13 @@ function ReviewWorkspace({
         version: draft.version,
         fields,
       });
+      if (!mounted.current) return;
       setDraft(result);
       setFields(result.fields);
       setDirty(false);
       setNotice('Wersja robocza została zapisana.');
+      setWarningAcknowledged(false);
+      setApprovalNote('');
       refresh();
     } catch (failure) {
       setError(failure);
@@ -400,19 +420,30 @@ function ReviewWorkspace({
       setBusy('');
     }
   }
-  async function run(action: 'approve' | 'reset' | 'reread' | 'reload') {
+  async function run(action: 'approve' | 'reset' | 'reread' | 'reload' | 'manual') {
+    if (busy) return;
     setConfirm(null);
     setBusy(action);
     setError(null);
     setNotice('');
     try {
-      if (action === 'reread') {
+      if (action === 'manual') {
+        const result = await post<Draft>(`/api/documents/${document.id}/review/manual/`);
+        if (!mounted.current) return;
+        setDraft(result);
+        setFields(result.fields);
+        setDirty(false);
+        setNotice(
+          'Utworzono ręczną wersję roboczą wniosku komunikacyjnego. Wynik silnika pozostaje bez zmian.',
+        );
+      } else if (action === 'reread') {
         await post<Job>(`/api/documents/${document.id}/extract/`);
         setNotice(
           'Zlecono lokalny odczyt. Aktualna wersja robocza i zatwierdzenia pozostają dostępne.',
         );
       } else if (action === 'reload') {
         const latest = await api<Review>(`/api/documents/${document.id}/review/`);
+        if (!mounted.current) return;
         setDraft(latest.draft);
         setFields(latest.draft?.fields ?? []);
         setDirty(false);
@@ -421,6 +452,7 @@ function ReviewWorkspace({
         const result = await post<Draft>(`/api/documents/${document.id}/review/reset/`, {
           version: draft?.version ?? 0,
         });
+        if (!mounted.current) return;
         setDraft(result);
         setFields(result.fields);
         setDirty(false);
@@ -428,9 +460,42 @@ function ReviewWorkspace({
       } else {
         const result = await post<Revision>(`/api/documents/${document.id}/approve/`, {
           version: draft?.version,
+          warning_digest: draft?.warning_digest,
+          confirm_warnings: warningAcknowledged,
+          note: approvalNote,
         });
+        if (!mounted.current) return;
+        setDraft((current) => (current ? { ...current, approved_version: current.version } : null));
         setNotice(`Zatwierdzono rewizję ${result.number}. Możesz pobrać jej eksport kontrolny.`);
       }
+      setWarningAcknowledged(false);
+      setApprovalNote('');
+      refresh();
+    } catch (failure) {
+      setError(failure);
+    } finally {
+      setBusy('');
+    }
+  }
+  async function mutateGroup(
+    operation: { group: 'participants' | 'coverage_items' } | { group_id: string },
+  ) {
+    if (!draft || busy || dirty) return;
+    setRemoveGroup(null);
+    setBusy('group');
+    setError(null);
+    try {
+      const result = await api<Draft>(`/api/documents/${document.id}/review/groups/`, {
+        method: 'group' in operation ? 'POST' : 'DELETE',
+        body: JSON.stringify({ version: draft.version, ...operation }),
+      });
+      if (!mounted.current) return;
+      setDraft(result);
+      setFields(result.fields);
+      setDirty(false);
+      setWarningAcknowledged(false);
+      setApprovalNote('');
+      setNotice('Zapisano zmianę struktury wersji roboczej.');
       refresh();
     } catch (failure) {
       setError(failure);
@@ -453,7 +518,7 @@ function ReviewWorkspace({
   const latestRevision = revisions[0];
   return (
     <>
-      <UnsavedGuard dirty={dirty} />
+      <UnsavedGuard dirty={dirty || !!busy} />
       <PageHeading
         title={document.original_name}
         eyebrow="WERYFIKACJA DOKUMENTU"
@@ -565,7 +630,9 @@ function ReviewWorkspace({
                   </a>
                 }
               />
-            ) : document.page_count && review.engine_result && !previewError ? (
+            ) : document.page_count &&
+              (review.engine_result || draft?.origin === 'manual' || job?.status === 'failed') &&
+              !previewError ? (
               <img
                 className="document-preview"
                 src={`/api/documents/${document.id}/pages/${page}/?result=${review.engine_result?.id ?? 0}`}
@@ -634,6 +701,15 @@ function ReviewWorkspace({
             <Empty
               title="Brak profilu automatycznego odczytu"
               description="Ten dokument nie został rozpoznany jako wniosek brokerski komunikacyjny. Oryginał pozostaje dostępny."
+              action={
+                <Button
+                  disabled={!!busy || running}
+                  variant="secondary"
+                  onClick={() => setConfirm('manual')}
+                >
+                  Uzupełnij ręcznie — wniosek komunikacyjny
+                </Button>
+              }
             />
           ) : !draft ? (
             <Empty
@@ -641,36 +717,132 @@ function ReviewWorkspace({
               description="Pilot rozpoznaje wybrane dane wniosku brokerskiego komunikacyjnego."
               action={
                 !running ? (
-                  <Button disabled={!!busy} onClick={() => void run('reread')}>
-                    <RotateCcw size={16} />
-                    Uruchom odczyt
-                  </Button>
+                  <>
+                    <Button disabled={!!busy} onClick={() => void run('reread')}>
+                      <RotateCcw size={16} />
+                      Uruchom odczyt
+                    </Button>
+                    {job?.status === 'failed' && (
+                      <Button
+                        variant="secondary"
+                        disabled={!!busy}
+                        onClick={() => setConfirm('manual')}
+                      >
+                        Uzupełnij ręcznie — wniosek komunikacyjny
+                      </Button>
+                    )}
+                  </>
                 ) : undefined
               }
             />
           ) : (
             <div className="extraction-groups">
-              {groupFields(fields).map(([group, items]) => (
-                <section className="extraction-group" key={group}>
-                  <h3>
-                    <span className="group-index">
-                      {groupFields(fields).findIndex(([name]) => name === group) + 1}
-                    </span>
-                    {groupLabels[group] ?? group}
-                  </h3>
-                  {items.map((field) => (
-                    <ReviewField
-                      key={fieldKey(field)}
-                      field={field}
-                      original={draft.fields.find(
-                        (original) => fieldKey(original) === fieldKey(field),
-                      )}
-                      onChange={(change) => changeField(field, change)}
-                      onSource={() => setPage(field.page ?? 1)}
-                    />
-                  ))}
-                </section>
-              ))}
+              {draft.origin === 'manual' && (
+                <Alert kind="info">
+                  Ręczne uzupełnienie profilu komunikacyjnego. Puste pola i dodane grupy nie są
+                  wynikiem OCR; autor i czas zmian są zapisywane.
+                </Alert>
+              )}
+              {!!draft.warnings?.length && (
+                <Alert kind="warning">
+                  <strong>Walidacja zapisanej wersji {draft.version}</strong>
+                  {dirty && <p>Po zapisaniu zmian serwer ponownie sprawdzi ostrzeżenia.</p>}
+                  <ul>
+                    {draft.warnings.map((warning) => (
+                      <li key={warning.id}>
+                        {warning.message}
+                        {warning.requires_note ? ' Wymaga notatki przy zatwierdzeniu.' : ''}
+                      </li>
+                    ))}
+                  </ul>
+                </Alert>
+              )}
+              {groupFields(fields).map(([group, items]) => {
+                const repeated = group === 'participants' || group === 'coverage_items';
+                const groups = new Map<string, Field[]>();
+                items.forEach((field) => {
+                  const key = field.group_id ?? `${group}:${field.index}`;
+                  groups.set(key, [...(groups.get(key) ?? []), field]);
+                });
+                return (
+                  <section className="extraction-group" key={group}>
+                    <h3>
+                      <span className="group-index">
+                        {groupFields(fields).findIndex(([name]) => name === group) + 1}
+                      </span>
+                      {groupLabels[group] ?? group}
+                    </h3>
+                    {repeated
+                      ? [...groups].map(([identity, groupItems]) => (
+                          <div className="repeat-group" key={identity}>
+                            <div className="card-heading">
+                              <h4>
+                                {group === 'participants' ? 'Uczestnik' : 'Element ochrony'}{' '}
+                                {groupItems[0]!.index + 1}
+                              </h4>
+                              {groupItems[0]?.group_id && (
+                                <Button
+                                  variant="ghost"
+                                  disabled={dirty || !!busy}
+                                  onClick={() =>
+                                    setRemoveGroup({
+                                      id: identity,
+                                      label: `${group === 'participants' ? 'uczestnika' : 'element ochrony'} ${groupItems[0]!.index + 1}`,
+                                    })
+                                  }
+                                >
+                                  Usuń {group === 'participants' ? 'uczestnika' : 'element'}
+                                </Button>
+                              )}
+                            </div>
+                            {groupItems.map((field) => (
+                              <ReviewField
+                                key={fieldKey(field)}
+                                field={field}
+                                disabled={!!busy}
+                                original={draft.fields.find(
+                                  (original) => fieldKey(original) === fieldKey(field),
+                                )}
+                                onChange={(change) => changeField(field, change)}
+                                onSource={() => setPage(field.page ?? 1)}
+                              />
+                            ))}
+                          </div>
+                        ))
+                      : items.map((field) => (
+                          <ReviewField
+                            key={fieldKey(field)}
+                            field={field}
+                            disabled={!!busy}
+                            original={draft.fields.find(
+                              (original) => fieldKey(original) === fieldKey(field),
+                            )}
+                            onChange={(change) => changeField(field, change)}
+                            onSource={() => setPage(field.page ?? 1)}
+                          />
+                        ))}
+                  </section>
+                );
+              })}
+              <div className="group-actions">
+                <Button
+                  variant="secondary"
+                  disabled={dirty || !!busy}
+                  onClick={() => void mutateGroup({ group: 'participants' })}
+                >
+                  <Plus size={16} />
+                  Dodaj uczestnika ręcznie
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={dirty || !!busy}
+                  onClick={() => void mutateGroup({ group: 'coverage_items' })}
+                >
+                  <Plus size={16} />
+                  Dodaj element ochrony ręcznie
+                </Button>
+                {dirty && <small>Zapisz bieżące pola przed dodaniem lub usunięciem grupy.</small>}
+              </div>
             </div>
           )}
           {draft && (
@@ -687,7 +859,11 @@ function ReviewWorkspace({
                 </Button>
                 <Button
                   disabled={dirty || !!busy || running || draft.approved_version === draft.version}
-                  onClick={() => setConfirm('approve')}
+                  onClick={() => {
+                    setWarningAcknowledged(false);
+                    setApprovalNote('');
+                    setConfirm('approve');
+                  }}
                 >
                   <Check size={17} />
                   Zatwierdź wersję
@@ -774,6 +950,7 @@ function ReviewWorkspace({
           title={
             {
               approve: 'Zatwierdź wersję odczytu',
+              manual: 'Uzupełnij ręcznie wniosek komunikacyjny',
               reset: 'Zastąp wersję roboczą',
               reread: 'Uruchom ponowny odczyt',
               reload: 'Wczytaj bieżącą wersję',
@@ -784,6 +961,8 @@ function ReviewWorkspace({
           <p>
             {
               {
+                manual:
+                  'Świadomie wybierasz ograniczony profil wniosku komunikacyjnego. Otrzymasz ręczny szkic i dostępny podgląd. Nie zmienisz wyniku rozpoznania ani nie utworzysz kartoteki klienta lub polisy.',
                 approve:
                   'Zatwierdzenie zapisze niezmienną rewizję z Twoim nazwiskiem i datą. Późniejsza korekta będzie wymagała kolejnej rewizji. Dane kartoteki i polisy nie zostaną zmienione.',
                 reset:
@@ -795,18 +974,51 @@ function ReviewWorkspace({
               }[confirm]
             }
           </p>
-          {confirm === 'approve' && missing > 0 && (
-            <Alert kind="warning">
-              Pozostało {missing} pustych pól. Jeśli informacji nie ma w dokumencie, oznacz
-              odpowiednie pole jako „Brak w dokumencie”. Możesz zatwierdzić niepełny odczyt
-              świadomie.
-            </Alert>
+          {confirm === 'approve' && !!draft?.warnings?.length && (
+            <>
+              <Alert kind="warning">
+                <strong>Ostrzeżenia wersji {draft.version}</strong>
+                <ul>
+                  {draft.warnings.map((warning) => (
+                    <li key={warning.id}>{warning.message}</li>
+                  ))}
+                </ul>
+              </Alert>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={warningAcknowledged}
+                  onChange={(event) => setWarningAcknowledged(event.target.checked)}
+                />
+                Zapoznałem się z aktualnymi ostrzeżeniami i świadomie zatwierdzam tę wersję.
+              </label>
+              <FieldLabel
+                label="Notatka do zatwierdzenia"
+                required={draft.warnings.some((item) => item.requires_note)}
+                hint="Przy istotnej sprzeczności wyjaśnij decyzję. Nie uzupełniaj danych domysłem."
+              >
+                <textarea
+                  value={approvalNote}
+                  rows={3}
+                  maxLength={2000}
+                  onChange={(event) => setApprovalNote(event.target.value)}
+                />
+              </FieldLabel>
+            </>
           )}
           <div className="form-actions">
             <Button variant="secondary" onClick={() => setConfirm(null)}>
               Anuluj
             </Button>
             <Button
+              disabled={
+                !!busy ||
+                (confirm === 'approve' &&
+                  !!draft?.warnings?.length &&
+                  (!warningAcknowledged ||
+                    (draft.warnings.some((item) => item.requires_note) &&
+                      approvalNote.trim().length < 3)))
+              }
               variant={confirm === 'reset' ? 'danger' : 'primary'}
               onClick={() => void run(confirm)}
             >
@@ -814,9 +1026,27 @@ function ReviewWorkspace({
                 ? 'Potwierdź zatwierdzenie'
                 : confirm === 'reset'
                   ? 'Zastąp wersję roboczą'
-                  : confirm === 'reload'
-                    ? 'Wczytaj aktualne dane'
-                    : 'Zleć ponowny odczyt'}
+                  : confirm === 'manual'
+                    ? 'Utwórz ręczny szkic'
+                    : confirm === 'reload'
+                      ? 'Wczytaj aktualne dane'
+                      : 'Zleć ponowny odczyt'}
+            </Button>
+          </div>
+        </Modal>
+      )}
+      {removeGroup && (
+        <Modal title={`Usuń ${removeGroup.label}`} onClose={() => setRemoveGroup(null)}>
+          <p>
+            Grupa zostanie usunięta z wersji roboczej. Pozostałe grupy zachowają tożsamość, a
+            historyczne rewizje pozostaną niezmienione.
+          </p>
+          <div className="form-actions">
+            <Button variant="secondary" onClick={() => setRemoveGroup(null)}>
+              Anuluj
+            </Button>
+            <Button variant="danger" onClick={() => void mutateGroup({ group_id: removeGroup.id })}>
+              Potwierdź usunięcie grupy
             </Button>
           </div>
         </Modal>
@@ -862,7 +1092,9 @@ export function ReviewField({
   original,
   onChange,
   onSource,
+  disabled = false,
 }: {
+  disabled?: boolean;
   field: Field;
   original?: Field;
   onChange: (change: Pick<Partial<Field>, 'value' | 'absent'>) => void;
@@ -891,27 +1123,46 @@ export function ReviewField({
         <select
           id={id}
           value={field.value ?? ''}
-          disabled={field.absent}
+          disabled={disabled || field.absent}
           onChange={(event) => onChange({ value: event.target.value || null, absent: false })}
         >
           <option value="">Wybierz rolę</option>
           <option value="policyholder">Ubezpieczający</option>
           <option value="insured">Ubezpieczony</option>
           <option value="owner">Właściciel</option>
-          {field.value && !['policyholder', 'insured', 'owner'].includes(field.value) && (
-            <option value={field.value}>{field.value}</option>
-          )}
+          <option value="policyholder,insured">Ubezpieczający i ubezpieczony</option>
+          <option value="policyholder,owner">Ubezpieczający i właściciel</option>
+          <option value="insured,owner">Ubezpieczony i właściciel</option>
+          <option value="policyholder,insured,owner">
+            Ubezpieczający, ubezpieczony i właściciel
+          </option>
+          {field.value &&
+            ![
+              'policyholder',
+              'insured',
+              'owner',
+              'policyholder,insured',
+              'policyholder,owner',
+              'insured,owner',
+              'policyholder,insured,owner',
+            ].includes(field.value) && <option value={field.value}>{field.value}</option>}
         </select>
       ) : (
         <input
           id={id}
-          type={field.type === 'date' ? 'date' : 'text'}
+          type="text"
           inputMode={
             field.type === 'decimal' ? 'decimal' : field.type === 'integer' ? 'numeric' : undefined
           }
           value={field.value ?? ''}
-          disabled={field.absent}
-          placeholder={field.absent ? 'Brak w dokumencie' : 'Uzupełnij lub oznacz brak'}
+          disabled={disabled || field.absent}
+          placeholder={
+            field.absent
+              ? 'Brak w dokumencie'
+              : field.type === 'date'
+                ? 'RRRR-MM-DD'
+                : 'Uzupełnij lub oznacz brak'
+          }
           onChange={(event) =>
             onChange({
               value: event.target.value === '' ? null : event.target.value,
@@ -924,6 +1175,7 @@ export function ReviewField({
         <label className="checkbox-label">
           <input
             type="checkbox"
+            disabled={disabled}
             checked={field.absent}
             onChange={(event) =>
               onChange({
@@ -946,7 +1198,7 @@ export function ReviewField({
       {!manual && field.source && <p className="source-text">„{field.source}”</p>}
       {field.warnings?.length > 0 && (
         <p className="field-warning">
-          {manual ? 'Ostrzeżenie pierwotnego odczytu: ' : ''}
+          {locallyChanged ? 'Ostrzeżenie poprzednio zapisanej wartości: ' : ''}
           {field.warnings.join(' · ')}
         </p>
       )}

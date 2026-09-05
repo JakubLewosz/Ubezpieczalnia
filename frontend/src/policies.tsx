@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Archive, FileText, Pencil, Plus, Search, ShieldCheck, X } from 'lucide-react';
 import { date, money, params, patch, post } from './api';
 import { ClientPicker } from './clients';
-import { useApi, useDebounce } from './hooks';
+import { useApi, useDebounce, useMounted } from './hooks';
 import type { Client, DocumentRecord, Page, Participant, Policy } from './types';
 import {
   Alert,
@@ -143,14 +143,14 @@ export function PolicyFormPage() {
   if ((id && !resource.data) || (query.get('client') && !client.data)) return <Loading />;
   return (
     <PolicyForm
-      key={resource.data?.version ?? 'new'}
+      key={`${id ?? 'new'}-${query.get('client') ?? ''}-${resource.data?.version ?? 0}`}
       initial={resource.data}
       initialClient={client.data}
       reload={resource.reload}
     />
   );
 }
-function PolicyForm({
+export function PolicyForm({
   initial,
   initialClient,
   reload,
@@ -160,6 +160,7 @@ function PolicyForm({
   reload: () => void;
 }) {
   const navigate = useNavigate();
+  const mounted = useMounted();
   const [values, setValues] = useState<PolicyInput>(
     initial ?? {
       ...emptyPolicy,
@@ -180,11 +181,7 @@ function PolicyForm({
     [participantPicker, setParticipantPicker] = useState(false),
     [newRole, setNewRole] = useState<Participant['role']>('insured'),
     [saved, setSaved] = useState<Policy | null>(null),
-    [confirmReload, setConfirmReload] = useState(false),
-    [documentSearch, setDocumentSearch] = useState('');
-  const documents = useApi<Page<DocumentRecord>>(
-    `/api/documents/?${params({ search: useDebounce(documentSearch) })}`,
-  );
+    [confirmReload, setConfirmReload] = useState(false);
   function update<K extends keyof PolicyInput>(key: K, value: PolicyInput[K]) {
     setValues((previous) => ({ ...previous, [key]: value }));
     setDirty(true);
@@ -201,6 +198,7 @@ function PolicyForm({
   }
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
     if (!values.participants.length) {
       setError(new Error('Dodaj co najmniej jednego uczestnika polisy.'));
       return;
@@ -216,7 +214,9 @@ function PolicyForm({
       const policy = initial
         ? await patch<Policy>(`/api/policies/${initial.id}/`, payload)
         : await post<Policy>('/api/policies/', payload);
+      if (!mounted.current) return;
       flushSync(() => {
+        setBusy(false);
         setDirty(false);
         setSaved(policy);
       });
@@ -229,7 +229,7 @@ function PolicyForm({
   }
   return (
     <>
-      <UnsavedGuard dirty={dirty} />
+      <UnsavedGuard dirty={dirty || !!busy} />
       <PageHeading
         title={initial ? 'Edytuj polisę' : 'Nowa polisa'}
         description="Wprowadź dane zawartej umowy. Pola z gwiazdką są wymagane."
@@ -239,200 +239,165 @@ function PolicyForm({
         }}
       />
       <form className="panel form-panel" onSubmit={submit}>
-        {!!error && (
-          <ErrorNotice
-            error={error}
-            onReload={initial ? () => setConfirmReload(true) : undefined}
-          />
-        )}
-        <Warnings items={saved?.duplicate_warnings} />
-        {saved && (
-          <Alert kind="success">
-            Polisa została zapisana.{' '}
-            <Link to={`/policies/${saved.id}`}>Otwórz szczegóły polisy</Link>
-          </Alert>
-        )}
-        <h2>Dane umowy</h2>
-        <div className="form-grid">
-          <FieldLabel label="Ubezpieczyciel" required>
-            <input
-              value={values.insurer}
-              required
-              onChange={(event) => update('insurer', event.target.value)}
+        <fieldset disabled={busy} className="form-lock">
+          {!!error && (
+            <ErrorNotice
+              error={error}
+              onReload={initial ? () => setConfirmReload(true) : undefined}
             />
-          </FieldLabel>
-          <FieldLabel label="Numer polisy" required>
-            <input
-              value={values.number}
-              required
-              onChange={(event) => update('number', event.target.value)}
-            />
-          </FieldLabel>
-          <FieldLabel label="Rodzaj ubezpieczenia" required className="span-2">
-            <input
-              placeholder="Np. komunikacyjne OC / AC"
-              value={values.insurance_type}
-              required
-              onChange={(event) => update('insurance_type', event.target.value)}
-            />
-          </FieldLabel>
-          <FieldLabel label="Początek ochrony" required>
-            <input
-              type="date"
-              value={values.start_date}
-              required
-              onChange={(event) => update('start_date', event.target.value)}
-            />
-          </FieldLabel>
-          <FieldLabel label="Koniec ochrony" required>
-            <input
-              type="date"
-              min={values.start_date || undefined}
-              value={values.end_date}
-              required
-              onChange={(event) => update('end_date', event.target.value)}
-            />
-          </FieldLabel>
-          <FieldLabel label="Składka" hint="Pozostaw puste, jeśli składka jest nieznana.">
-            <input
-              inputMode="decimal"
-              pattern="[0-9]+([.,][0-9]{1,2})?"
-              value={values.premium ?? ''}
-              onChange={(event) =>
-                update(
-                  'premium',
-                  event.target.value === '' ? null : event.target.value.replace(',', '.'),
-                )
-              }
-            />
-          </FieldLabel>
-          <FieldLabel label="Waluta">
-            <select
-              value={values.currency}
-              onChange={(event) => update('currency', event.target.value)}
-            >
-              <option>PLN</option>
-              <option>EUR</option>
-              <option>USD</option>
-              <option>GBP</option>
-              <option>CHF</option>
-            </select>
-          </FieldLabel>
-          <FieldLabel label="Opis przedmiotu ubezpieczenia" className="span-2">
-            <textarea
-              rows={3}
-              value={values.subject}
-              onChange={(event) => update('subject', event.target.value)}
-            />
-          </FieldLabel>
-        </div>
-        <div className="form-divider" />
-        <div className="card-heading">
-          <div>
-            <h2>Uczestnicy polisy</h2>
-            <p className="muted">
-              Dodaj ubezpieczającego i co najmniej jednego ubezpieczonego. Jedna kartoteka może
-              pełnić obie role.
-            </p>
-          </div>
-          <Button type="button" variant="secondary" onClick={() => setParticipantPicker(true)}>
-            <Plus size={16} />
-            Dodaj uczestnika
-          </Button>
-        </div>
-        {values.participants.length ? (
-          <div className="participant-list">
-            {values.participants.map((participant, index) => (
-              <div className="participant-row" key={`${participant.client}-${participant.role}`}>
-                <span>
-                  <strong>{participant.client_name}</strong>
-                  <small>
-                    {participant.role === 'insured' ? 'Ubezpieczony' : 'Ubezpieczający'}
-                  </small>
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() =>
-                    update(
-                      'participants',
-                      values.participants.filter((_, i) => i !== index),
-                    )
-                  }
-                  aria-label={`Usuń uczestnika ${participant.client_name}, ${participant.role === 'insured' ? 'ubezpieczony' : 'ubezpieczający'}`}
-                >
-                  <X size={17} />
-                </Button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <Empty
-            title="Dodaj uczestnika"
-            description="Wybierz osobę lub organizację z istniejących kartotek."
-          />
-        )}
-        <div className="form-divider" />
-        <h2>Powiązane dokumenty</h2>
-        <p className="muted">Możesz powiązać pliki wcześniej dodane do kancelarii.</p>
-        <label className="search-field">
-          <Search size={17} />
-          <input
-            aria-label="Szukaj dokumentów do polisy"
-            placeholder="Szukaj dokumentów…"
-            value={documentSearch}
-            onChange={(event) => setDocumentSearch(event.target.value)}
-          />
-        </label>
-        <div className="document-checks">
-          {values.document_ids
-            .filter((id) => !documents.data?.results.some((document) => document.id === id))
-            .map((id) => (
-              <label key={id}>
-                <input
-                  type="checkbox"
-                  checked
-                  onChange={() =>
-                    update(
-                      'document_ids',
-                      values.document_ids.filter((value) => value !== id),
-                    )
-                  }
-                />
-                Dokument #{id} — powiązany
-              </label>
-            ))}
-          {documents.data?.results.map((document) => (
-            <label key={document.id}>
+          )}
+          <Warnings items={saved?.duplicate_warnings} />
+          {saved && (
+            <Alert kind="success">
+              Polisa została zapisana.{' '}
+              <Link to={`/policies/${saved.id}`}>Otwórz szczegóły polisy</Link>
+            </Alert>
+          )}
+          <h2>Dane umowy</h2>
+          <div className="form-grid">
+            <FieldLabel label="Ubezpieczyciel" required>
               <input
-                type="checkbox"
-                checked={values.document_ids.includes(document.id)}
+                value={values.insurer}
+                required
+                onChange={(event) => update('insurer', event.target.value)}
+              />
+            </FieldLabel>
+            <FieldLabel label="Numer polisy" required>
+              <input
+                value={values.number}
+                required
+                onChange={(event) => update('number', event.target.value)}
+              />
+            </FieldLabel>
+            <FieldLabel label="Rodzaj ubezpieczenia" required className="span-2">
+              <input
+                placeholder="Np. komunikacyjne OC / AC"
+                value={values.insurance_type}
+                required
+                onChange={(event) => update('insurance_type', event.target.value)}
+              />
+            </FieldLabel>
+            <FieldLabel label="Początek ochrony" required>
+              <input
+                type="date"
+                value={values.start_date}
+                required
+                onChange={(event) => update('start_date', event.target.value)}
+              />
+            </FieldLabel>
+            <FieldLabel label="Koniec ochrony" required>
+              <input
+                type="date"
+                min={values.start_date || undefined}
+                value={values.end_date}
+                required
+                onChange={(event) => update('end_date', event.target.value)}
+              />
+            </FieldLabel>
+            <FieldLabel label="Składka" hint="Pozostaw puste, jeśli składka jest nieznana.">
+              <input
+                inputMode="decimal"
+                pattern="[0-9]+([.,][0-9]{1,2})?"
+                value={values.premium ?? ''}
                 onChange={(event) =>
                   update(
-                    'document_ids',
-                    event.target.checked
-                      ? [...values.document_ids, document.id]
-                      : values.document_ids.filter((value) => value !== document.id),
+                    'premium',
+                    event.target.value === '' ? null : event.target.value.replace(',', '.'),
                   )
                 }
               />
-              <FileText size={16} />
-              <span>
-                {document.original_name}
-                <small>{document.client_name}</small>
-              </span>
-            </label>
-          ))}
-        </div>
-        {documents.error && <ErrorNotice error={documents.error} />}
-        <div className="form-actions">
-          <Link className="button secondary" to={initial ? `/policies/${initial.id}` : '/policies'}>
-            Anuluj
-          </Link>
-          <Button type="submit" disabled={busy || !!saved}>
-            {busy ? 'Zapisywanie…' : 'Zapisz polisę'}
-          </Button>
-        </div>
+            </FieldLabel>
+            <FieldLabel label="Waluta">
+              <select
+                value={values.currency}
+                onChange={(event) => update('currency', event.target.value)}
+              >
+                <option>PLN</option>
+                <option>EUR</option>
+                <option>USD</option>
+                <option>GBP</option>
+                <option>CHF</option>
+              </select>
+            </FieldLabel>
+            <FieldLabel label="Opis przedmiotu ubezpieczenia" className="span-2">
+              <textarea
+                rows={3}
+                value={values.subject}
+                onChange={(event) => update('subject', event.target.value)}
+              />
+            </FieldLabel>
+          </div>
+          <div className="form-divider" />
+          <div className="card-heading">
+            <div>
+              <h2>Uczestnicy polisy</h2>
+              <p className="muted">
+                Dodaj ubezpieczającego i co najmniej jednego ubezpieczonego. Jedna kartoteka może
+                pełnić obie role.
+              </p>
+            </div>
+            <Button type="button" variant="secondary" onClick={() => setParticipantPicker(true)}>
+              <Plus size={16} />
+              Dodaj uczestnika
+            </Button>
+          </div>
+          {values.participants.length ? (
+            <div className="participant-list">
+              {values.participants.map((participant, index) => (
+                <div className="participant-row" key={`${participant.client}-${participant.role}`}>
+                  <span>
+                    <strong>{participant.client_name}</strong>
+                    <small>
+                      {participant.role === 'insured' ? 'Ubezpieczony' : 'Ubezpieczający'}
+                    </small>
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() =>
+                      update(
+                        'participants',
+                        values.participants.filter((_, i) => i !== index),
+                      )
+                    }
+                    aria-label={`Usuń uczestnika ${participant.client_name}, ${participant.role === 'insured' ? 'ubezpieczony' : 'ubezpieczający'}`}
+                  >
+                    <X size={17} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Empty
+              title="Dodaj uczestnika"
+              description="Wybierz osobę lub organizację z istniejących kartotek."
+            />
+          )}
+          <div className="form-divider" />
+          <PolicyDocuments
+            policyId={initial?.id}
+            participants={values.participants.map((item) => item.client)}
+            participantsChanged={
+              !!initial &&
+              initial.participants.some(
+                (item) => !values.participants.some((value) => value.client === item.client),
+              )
+            }
+            selected={values.document_ids}
+            onChange={(ids) => update('document_ids', ids)}
+          />
+          <div className="form-actions">
+            <Link
+              className="button secondary"
+              to={initial ? `/policies/${initial.id}` : '/policies'}
+            >
+              Anuluj
+            </Link>
+            <Button type="submit" disabled={busy || !!saved}>
+              {busy ? 'Zapisywanie…' : 'Zapisz polisę'}
+            </Button>
+          </div>
+        </fieldset>
       </form>
       {participantPicker && (
         <Modal title="Dodaj uczestnika polisy" onClose={() => setParticipantPicker(false)}>
@@ -608,5 +573,201 @@ export function PolicyDetailPage() {
         </Modal>
       )}
     </>
+  );
+}
+
+/** Selection lives in the parent; searching and paging only changes candidates. */
+export function PolicyPicker({
+  clientId,
+  selected,
+  onSelect,
+}: {
+  clientId: number;
+  selected: Policy | null;
+  onSelect: (policy: Policy | null) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const query = useDebounce(search);
+  const filterKey = `${clientId}:${query}`;
+  const [pagination, setPagination] = useState({ key: filterKey, page: 1 });
+  const page = pagination.key === filterKey ? pagination.page : 1;
+  const resource = useApi<Page<Policy>>(
+    `/api/policies/?${params({ client: clientId, archived: 'false', search: query, page })}`,
+  );
+  return (
+    <div className="relation-picker">
+      <FieldLabel label="Szukaj polisy klienta">
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Numer lub ubezpieczyciel…"
+        />
+      </FieldLabel>
+      {selected && (
+        <div className="selected-relation">
+          <strong>
+            Wybrano: {selected.number} · {selected.insurer}
+          </strong>
+          <Button variant="ghost" onClick={() => onSelect(null)}>
+            Usuń powiązanie z polisą
+          </Button>
+        </div>
+      )}
+      <FieldLabel
+        label="Powiązana polisa"
+        hint="Opcjonalnie. Dostępne są aktywne kartoteki polis tego klienta; zakończona ochrona nie oznacza archiwizacji."
+      >
+        <select
+          value={selected?.id ?? ''}
+          onChange={(event) =>
+            onSelect(
+              resource.data?.results.find((item) => item.id === Number(event.target.value)) ?? null,
+            )
+          }
+        >
+          <option value="">Bez powiązania z polisą</option>
+          {selected && !resource.data?.results.some((item) => item.id === selected.id) && (
+            <option value={selected.id}>
+              {selected.number} · {selected.insurer} (wybrana)
+            </option>
+          )}
+          {resource.data?.results.map((item) => (
+            <option value={item.id} key={item.id}>
+              {item.number} · {item.insurer}
+            </option>
+          ))}
+        </select>
+      </FieldLabel>
+      {resource.error && <ErrorNotice error={resource.error} onReload={resource.reload} />}
+      {resource.loading && !resource.data && <Loading />}
+      {resource.data && (
+        <Pagination
+          data={resource.data}
+          page={page}
+          onPage={(value) => setPagination({ key: filterKey, page: value })}
+        />
+      )}
+    </div>
+  );
+}
+
+export function PolicyDocuments({
+  policyId,
+  participants,
+  participantsChanged,
+  selected,
+  onChange,
+}: {
+  policyId?: number;
+  participants: number[];
+  participantsChanged: boolean;
+  selected: number[];
+  onChange: (ids: number[]) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const query = useDebounce(search);
+  const participantIds = [...new Set(participants)].sort((a, b) => a - b).join(',');
+  const filterKey = `${policyId ?? 'new'}:${participantIds}:${query}`;
+  const [pagination, setPagination] = useState({ key: filterKey, page: 1 });
+  const page = pagination.key === filterKey ? pagination.page : 1;
+  const documents = useApi<Page<DocumentRecord>>(
+    `/api/documents/?${params({ eligible_for_policy: policyId ?? 'new', participant_clients: participantIds, search: query, page })}`,
+  );
+  const [selectedPage, setSelectedPage] = useState(1);
+  const currentSelectedPage = Math.min(selectedPage, Math.max(1, Math.ceil(selected.length / 20)));
+  const selectedIds = selected.slice((currentSelectedPage - 1) * 20, currentSelectedPage * 20);
+  const selectedDocuments = useApi<Page<DocumentRecord>>(
+    selectedIds.length ? `/api/documents/?${params({ ids: selectedIds.join(',') })}` : null,
+  );
+  function toggle(id: number, checked: boolean) {
+    onChange(checked ? [...new Set([...selected, id])] : selected.filter((value) => value !== id));
+  }
+  return (
+    <section aria-label="Powiązane dokumenty">
+      <h2>Powiązane dokumenty</h2>
+      <p className="muted">
+        Wybierz nieprzypisane dokumenty uczestników. Zmiana wyszukiwania lub strony zachowuje
+        zaznaczenia.
+      </p>
+      {participantsChanged && selected.length > 0 && (
+        <Alert kind="warning">
+          Zmieniono uczestników. Wybrane dokumenty pozostają zaznaczone. Jeśli kartoteka dokumentu
+          przestała uczestniczyć w polisie, przywróć uczestnika albo jawnie odłącz dokument przed
+          zapisem. Serwer sprawdzi zgodność i równoczesne przypisania.
+        </Alert>
+      )}
+      {selected.length > 0 && (
+        <div className="selected-documents">
+          <h3>Wybrane dokumenty ({selected.length})</h3>
+          <div className="document-checks">
+            {selectedIds.map((id) => {
+              const item = selectedDocuments.data?.results.find((value) => value.id === id);
+              const incompatible = item && !participants.includes(item.client);
+              return (
+                <label key={id}>
+                  <input type="checkbox" checked onChange={() => toggle(id, false)} />
+                  <span>
+                    {item?.original_name ?? `Dokument #${id}`}
+                    <small>
+                      {item?.client_name}
+                      {incompatible ? ' · Konflikt: klient nie jest uczestnikiem' : ''}
+                    </small>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          {selectedDocuments.error && (
+            <ErrorNotice error={selectedDocuments.error} onReload={selectedDocuments.reload} />
+          )}
+          <Pagination
+            data={{
+              count: selected.length,
+              next: currentSelectedPage * 20 < selected.length ? 'next' : null,
+              previous: currentSelectedPage > 1 ? 'previous' : null,
+            }}
+            page={currentSelectedPage}
+            onPage={setSelectedPage}
+          />
+        </div>
+      )}
+      <label className="search-field">
+        <Search size={17} />
+        <input
+          aria-label="Szukaj dokumentów do polisy"
+          placeholder="Szukaj dokumentów…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      </label>
+      <div className="document-checks">
+        {documents.data?.results.map((item) => (
+          <label key={item.id}>
+            <input
+              type="checkbox"
+              checked={selected.includes(item.id)}
+              onChange={(event) => toggle(item.id, event.target.checked)}
+            />
+            <FileText size={16} />
+            <span>
+              {item.original_name}
+              <small>
+                {item.client_name}
+                {!participants.includes(item.client) ? ' · Konflikt uczestnika' : ''}
+              </small>
+            </span>
+          </label>
+        ))}
+      </div>
+      {documents.error && <ErrorNotice error={documents.error} onReload={documents.reload} />}
+      {documents.loading && !documents.data && <Loading />}
+      {documents.data && (
+        <Pagination
+          data={documents.data}
+          page={page}
+          onPage={(value) => setPagination({ key: filterKey, page: value })}
+        />
+      )}
+    </section>
   );
 }

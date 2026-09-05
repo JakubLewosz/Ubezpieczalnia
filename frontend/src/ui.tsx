@@ -17,6 +17,7 @@ import type { DocumentRecord, Page, Policy } from './types';
 export function Button({
   children,
   variant = 'primary',
+  type = 'button',
   className = '',
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -24,7 +25,7 @@ export function Button({
   children: ReactNode;
 }) {
   return (
-    <button className={`button ${variant} ${className}`} {...props}>
+    <button type={type} className={`button ${variant} ${className}`} {...props}>
       {children}
     </button>
   );
@@ -46,6 +47,12 @@ export function Alert({
 export function ErrorNotice({ error, onReload }: { error: unknown; onReload?: () => void }) {
   return (
     <Alert>
+      {error instanceof ApiError && error.status === 403 && (
+        <span>
+          Sesja wygasła lub nie masz uprawnień. Wpisana treść pozostaje w formularzu. Przed ponownym
+          logowaniem zachowaj swoje zmiany.{' '}
+        </span>
+      )}
       {error instanceof ApiError && error.status === 409
         ? 'Konflikt wersji. Ktoś zapisał nowsze dane. Twoje zmiany pozostają w formularzu; skopiuj je przed wczytaniem aktualnej wersji. '
         : ''}
