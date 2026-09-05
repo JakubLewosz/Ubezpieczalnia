@@ -1,0 +1,37 @@
+# Sekrety, dane aplikacji i materiały prywatne.
+.env
+.env.*
+!.env.example
+.local/
+/media/
+/uploads/
+/ocr/
+/exports/
+/backups/
+/private/
+*.sqlite3
+*.db
+*.dump
+*.sql
+*.bak
+*.pem
+*.key
+secrets/
+# Jawnie syntetyczne fixtures w fixtures/synthetic są częścią kodu.
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+node_modules/
+dist/
+playwright-report/
+test-results/
+*.log
+celerybeat-schedule*
+.DS_Store
+.codex/
+tmp/
+output/

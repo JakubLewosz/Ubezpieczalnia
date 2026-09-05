@@ -1,0 +1,90 @@
+name: broker-office-demo
+
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+  env_file: .env
+  environment: &backend-env
+    POSTGRES_HOST: db
+    POSTGRES_PORT: "5432"
+    REDIS_URL: redis://redis:6379/0
+    MEDIA_ROOT: /app/.local/media
+  volumes:
+    - private_media:/app/.local/media
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  init: true
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  db:
+    image: postgres:17.11-bookworm@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Uruchom scripts/generate_local_config.py}
+      POSTGRES_USER: ${POSTGRES_USER:?Uruchom scripts/generate_local_config.py}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Uruchom scripts/generate_local_config.py}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  redis:
+    image: redis:8.2.9-bookworm@sha256:7d1e4ce8b9395088377ab382d1f6cfdbd13b3690795198a0399ab8d683064d6d
+    command: [redis-server, --appendonly, "yes", --maxmemory, 256mb, --maxmemory-policy, noeviction]
+    volumes:
+      - queue:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  backend:
+    <<: *backend
+    # Django runserver służy wyłącznie lokalnemu demo (także statycznym zasobom admina).
+    command: [python, manage.py, runserver, "0.0.0.0:8000", --noreload]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/auth/csrf/')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 768m
+  worker:
+    <<: *backend
+    command: [sh, -c, 'exec celery -A config worker --loglevel=WARNING --concurrency=$${OCR_CONCURRENCY:-1} --prefetch-multiplier=1 --max-tasks-per-child=20']
+    mem_limit: 1536m
+    cpus: 1.0
+    pids_limit: 96
+    stop_grace_period: 45s
+  beat:
+    <<: *backend
+    command: [celery, -A, config, beat, --loglevel=WARNING, --schedule=/tmp/celerybeat-schedule]
+    mem_limit: 384m
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:8000
+    ports:
+      - 127.0.0.1:5173:5173
+    depends_on:
+      backend:
+        condition: service_healthy
+    init: true
+    mem_limit: 512m
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  database:
+  private_media:
+  queue:

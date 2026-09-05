@@ -1,0 +1,84 @@
+{
+  "notice": "DANE TESTOWE. Oczekiwania spisane niezależnie od generatora i parsera. Żadne identyfikatory nie należą do osób.",
+  "application_text.pdf": {
+    "profile": "broker_motor_application_v0",
+    "page_methods": ["text"],
+    "fields": {
+      "application.0.application_number": "TEST-WN-0007",
+      "application.0.document_date": "2026-08-20",
+      "participants.0.name": "Alicja Demonstracyjna DANE TESTOWE",
+      "participants.0.role": "policyholder",
+      "participants.0.email": "alicja@broker-demo.invalid",
+      "participants.1.name": "Bruno Przykładowy DANE TESTOWE",
+      "participants.1.role": "insured",
+      "participants.1.email": "bruno@broker-demo.invalid",
+      "vehicle.0.make": "TestMobil",
+      "vehicle.0.model": "Przykład 2",
+      "vehicle.0.registration": "TEST001",
+      "vehicle.0.vin": "TEST0000000000001",
+      "vehicle.0.year": "2022",
+      "coverage.0.start_date": "2026-10-01",
+      "coverage.0.end_date": "2027-09-30",
+      "coverage.0.requested_scope": "OC",
+      "coverage.1.requested_scope": "AC",
+      "coverage.2.requested_scope": "Assistance",
+      "coverage.0.insured_sum": "75000.00",
+      "coverage.0.premium": "1234.50",
+      "previous.0.insurer": "Towarzystwo Testowe DANE TESTOWE",
+      "previous.0.policy_number": "TEST-POL-0091",
+      "payment.0.payment_method": "przelew jednorazowy"
+    }
+  },
+  "application_scan.pdf": {
+    "same_fields_as": "application_text.pdf", "page_methods": ["ocr"],
+    "accepted_ocr_readings": {
+      "participants.0.email": [null],
+      "participants.1.email": [null],
+      "vehicle.0.registration": ["TESTO01"],
+      "vehicle.0.vin": [null]
+    }
+  },
+  "application.png": {
+    "same_fields_as": "application_text.pdf", "page_methods": ["ocr"],
+    "accepted_ocr_readings": {
+      "participants.1.email": [null],
+      "vehicle.0.model": ["Przyktad 2"],
+      "vehicle.0.registration": ["TESTOO1"]
+    }
+  },
+  "application.jpg": {
+    "same_fields_as": "application_text.pdf", "page_methods": ["ocr"],
+    "accepted_ocr_readings": {
+      "participants.1.name": ["Bruno Przyktadowy DANE TESTOWE"],
+      "participants.1.email": [null],
+      "vehicle.0.model": ["Przyktad 2"],
+      "vehicle.0.registration": ["TESTOO1"]
+    }
+  },
+  "application_mixed.pdf": {"same_fields_as": "application_text.pdf", "page_methods": ["text", "ocr"]},
+  "application_missing.pdf": {
+    "null_fields": ["vehicle.0.vin", "vehicle.0.year", "coverage.0.premium", "previous.0.policy_number"],
+    "fields": {"application.0.application_number": "TEST-WN-0007", "coverage.0.insured_sum": "75000.00"}
+  },
+  "application_holdout.pdf": {
+    "page_methods": ["text"],
+    "fields": {
+      "application.0.application_number": "TEST-WN-HOLDOUT-31",
+      "application.0.document_date": "2027-02-18",
+      "participants.0.name": "Celina Wzorcowa DANE TESTOWE",
+      "participants.1.name": "Damian Wariantowy DANE TESTOWE",
+      "vehicle.0.make": "AutoPróba",
+      "vehicle.0.vin": "TEST0000000000031",
+      "vehicle.0.year": "2024",
+      "coverage.0.start_date": "2027-03-01",
+      "coverage.0.end_date": "2028-02-29",
+      "coverage.0.insured_sum": "91000.00",
+      "coverage.0.premium": "2001.25",
+      "previous.0.policy_number": "TEST-OLD-0031",
+      "payment.0.payment_method": "dwie raty przelewem"
+    }
+  },
+  "unsupported_property.pdf": {"profile": null, "warning": "Brak profilu automatycznego odczytu"},
+  "encrypted.pdf": {"upload_rejected": true},
+  "corrupted.pdf": {"upload_rejected": true}
+}

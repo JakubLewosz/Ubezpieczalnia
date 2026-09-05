@@ -1,0 +1,230 @@
+[
+  {
+    "License": "BSD-3-Clause",
+    "Name": "Django",
+    "URL": "https://www.djangoproject.com/",
+    "Version": "5.2.17"
+  },
+  {
+    "License": "BSD-2-Clause",
+    "Name": "Pygments",
+    "URL": "https://pygments.org",
+    "Version": "2.21.0"
+  },
+  {
+    "License": "BSD License",
+    "Name": "amqp",
+    "URL": "http://github.com/celery/py-amqp",
+    "Version": "5.3.1"
+  },
+  {
+    "License": "BSD License",
+    "Name": "asgiref",
+    "URL": "https://github.com/django/asgiref/",
+    "Version": "3.12.1"
+  },
+  {
+    "License": "BSD License",
+    "Name": "billiard",
+    "URL": "https://github.com/celery/billiard",
+    "Version": "4.2.4"
+  },
+  {
+    "License": "BSD-3-Clause",
+    "Name": "celery",
+    "URL": "https://docs.celeryq.dev/",
+    "Version": "5.6.3"
+  },
+  {
+    "License": "MIT",
+    "Name": "charset-normalizer",
+    "URL": "https://github.com/jawah/charset_normalizer/blob/master/CHANGELOG.md",
+    "Version": "3.5.1"
+  },
+  {
+    "License": "BSD-3-Clause",
+    "Name": "click",
+    "URL": "https://github.com/pallets/click/",
+    "Version": "8.5.0"
+  },
+  {
+    "License": "MIT License",
+    "Name": "click-didyoumean",
+    "URL": "https://github.com/click-contrib/click-didyoumean",
+    "Version": "0.3.1"
+  },
+  {
+    "License": "BSD License",
+    "Name": "click-plugins",
+    "URL": "https://github.com/click-contrib/click-plugins",
+    "Version": "1.1.1.2"
+  },
+  {
+    "License": "MIT",
+    "Name": "click-repl",
+    "URL": "https://github.com/untitaker/click-repl",
+    "Version": "0.3.0"
+  },
+  {
+    "License": "BSD-3-Clause",
+    "Name": "djangorestframework",
+    "URL": "https://www.django-rest-framework.org",
+    "Version": "3.18.0"
+  },
+  {
+    "License": "MIT License",
+    "Name": "et_xmlfile",
+    "URL": "https://foss.heptapod.net/openpyxl/et_xmlfile",
+    "Version": "2.0.0"
+  },
+  {
+    "License": "MIT",
+    "Name": "gunicorn",
+    "URL": "https://gunicorn.org",
+    "Version": "25.3.0"
+  },
+  {
+    "License": "MIT",
+    "Name": "iniconfig",
+    "URL": "https://github.com/pytest-dev/iniconfig",
+    "Version": "2.3.0"
+  },
+  {
+    "License": "BSD-3-Clause",
+    "Name": "kombu",
+    "URL": "https://kombu.readthedocs.io",
+    "Version": "5.6.2"
+  },
+  {
+    "License": "MIT License",
+    "Name": "openpyxl",
+    "URL": "https://openpyxl.readthedocs.io",
+    "Version": "3.1.5"
+  },
+  {
+    "License": "Apache-2.0 OR BSD-2-Clause",
+    "Name": "packaging",
+    "URL": "https://github.com/pypa/packaging",
+    "Version": "26.3"
+  },
+  {
+    "License": "MIT-CMU",
+    "Name": "pillow",
+    "URL": "https://python-pillow.github.io",
+    "Version": "12.3.0"
+  },
+  {
+    "License": "MIT License",
+    "Name": "pluggy",
+    "URL": "UNKNOWN",
+    "Version": "1.6.0"
+  },
+  {
+    "License": "BSD License",
+    "Name": "prompt_toolkit",
+    "URL": "https://github.com/prompt-toolkit/python-prompt-toolkit",
+    "Version": "3.0.53"
+  },
+  {
+    "License": "LGPL-3.0-only",
+    "Name": "psycopg",
+    "URL": "https://psycopg.org/",
+    "Version": "3.3.5"
+  },
+  {
+    "License": "LGPL-3.0-only",
+    "Name": "psycopg-binary",
+    "URL": "https://psycopg.org/",
+    "Version": "3.3.5"
+  },
+  {
+    "License": "BSD-3-Clause",
+    "Name": "pypdf",
+    "URL": "https://github.com/py-pdf/pypdf",
+    "Version": "6.17.0"
+  },
+  {
+    "License": "BSD-3-Clause, Apache-2.0, dependency licenses",
+    "Name": "pypdfium2",
+    "URL": "https://github.com/pypdfium2-team/pypdfium2",
+    "Version": "5.13.0"
+  },
+  {
+    "License": "MIT",
+    "Name": "pytest",
+    "URL": "https://docs.pytest.org/en/latest/",
+    "Version": "9.1.1"
+  },
+  {
+    "License": "BSD License",
+    "Name": "pytest-django",
+    "URL": "https://github.com/pytest-dev/pytest-django",
+    "Version": "4.14.0"
+  },
+  {
+    "License": "Apache Software License; BSD License",
+    "Name": "python-dateutil",
+    "URL": "https://github.com/dateutil/dateutil",
+    "Version": "2.9.0.post0"
+  },
+  {
+    "License": "BSD-3-Clause",
+    "Name": "python-dotenv",
+    "URL": "https://github.com/theskumar/python-dotenv",
+    "Version": "1.2.3"
+  },
+  {
+    "License": "MIT",
+    "Name": "redis",
+    "URL": "https://github.com/redis/redis-py",
+    "Version": "6.4.0"
+  },
+  {
+    "License": "BSD License",
+    "Name": "reportlab",
+    "URL": "https://www.reportlab.com/",
+    "Version": "4.5.1"
+  },
+  {
+    "License": "MIT",
+    "Name": "ruff",
+    "URL": "https://docs.astral.sh/ruff",
+    "Version": "0.16.6"
+  },
+  {
+    "License": "MIT License",
+    "Name": "six",
+    "URL": "https://github.com/benjaminp/six",
+    "Version": "1.17.0"
+  },
+  {
+    "License": "BSD License",
+    "Name": "sqlparse",
+    "URL": "https://github.com/andialbrecht/sqlparse",
+    "Version": "0.6.0"
+  },
+  {
+    "License": "PSF-2.0",
+    "Name": "typing_extensions",
+    "URL": "https://github.com/python/typing_extensions",
+    "Version": "4.16.0"
+  },
+  {
+    "License": "Apache-2.0",
+    "Name": "tzdata",
+    "URL": "https://github.com/python/tzdata",
+    "Version": "2026.3"
+  },
+  {
+    "License": "MIT",
+    "Name": "tzlocal",
+    "URL": "https://github.com/regebro/tzlocal/blob/master/CHANGES.txt",
+    "Version": "5.4.4"
+  },
+  {
+    "License": "BSD License",
+    "Name": "vine",
+    "URL": "https://github.com/celery/vine",
+    "Version": "5.1.0"
+  }
+]

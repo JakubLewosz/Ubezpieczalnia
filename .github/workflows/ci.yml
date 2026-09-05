@@ -1,0 +1,118 @@
+name: Weryfikacja MVP
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17.11-bookworm@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0
+        env:
+          POSTGRES_USER: broker
+          POSTGRES_DB: broker_office
+          # Wyłącznie izolowany, jednorazowy runner CI z syntetycznymi danymi.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["127.0.0.1:5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U broker -d broker_office"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:8.2.9-bookworm@sha256:7d1e4ce8b9395088377ab382d1f6cfdbd13b3690795198a0399ab8d683064d6d
+        ports: ["127.0.0.1:6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DJANGO_ENV: development
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,testserver
+      DJANGO_CSRF_TRUSTED_ORIGINS: http://127.0.0.1:5173
+      POSTGRES_DB: broker_office
+      POSTGRES_USER: broker
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: "5432"
+      REDIS_URL: redis://127.0.0.1:6379/0
+      E2E_BASE_URL: http://127.0.0.1:5173
+      E2E_USERNAME: e2e.demo
+      OCR_CONCURRENCY: "1"
+      VITE_API_PROXY_TARGET: http://127.0.0.1:8000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.8"
+          python-version: "3.12"
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.2"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Narzędzia OCR
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-pol tesseract-ocr-eng fonts-dejavu-core
+          tesseract --list-langs
+      - name: Sekrety jednorazowej demonstracji
+        run: |
+          python - <<'PY'
+          import os, secrets
+          from pathlib import Path
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write('DJANGO_SECRET_KEY=' + secrets.token_urlsafe(64) + '\n')
+              output.write('E2E_PASSWORD=' + secrets.token_urlsafe(32) + '\n')
+          Path('.local').mkdir(exist_ok=True)
+          PY
+      - name: Instalacja z lockfile
+        run: |
+          uv sync --project backend --frozen
+          npm ci --prefix frontend
+      - name: Backend i prawdziwy OCR
+        run: |
+          uv run --project backend pytest backend/tests
+          uv run --project backend python backend/manage.py makemigrations --check --dry-run
+          uv run --project backend ruff check backend scripts
+      - name: Frontend
+        run: |
+          npm run check --prefix frontend
+          npm run lint --prefix frontend
+          npm test --prefix frontend
+          npm run build --prefix frontend
+      - name: Baza demonstracji
+        run: |
+          uv run --project backend python backend/manage.py migrate
+          uv run --project backend python - <<'PY'
+          import os, subprocess, sys
+          subprocess.run([sys.executable, 'backend/manage.py', 'seed_demo', '--username', os.environ['E2E_USERNAME'],
+              '--role', 'EMPLOYEE', '--password-stdin', '--without-documents'],
+              input=os.environ['E2E_PASSWORD'] + '\n', text=True, check=True)
+          PY
+      - name: Uruchomienie aplikacji
+        run: |
+          uv run --project backend python scripts/dev.py > .local/dev.log 2>&1 &
+          echo $! > .local/dev.pid
+          python - <<'PY'
+          import time, urllib.request
+          for attempt in range(60):
+              try:
+                  urllib.request.urlopen('http://127.0.0.1:5173/api/auth/csrf/', timeout=2)
+                  break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise SystemExit('Aplikacja nie rozpoczęła pracy w ciągu 60 sekund.')
+          PY
+      - name: Przebieg przeglądarkowy
+        working-directory: frontend
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+      - name: Zatrzymaj procesy
+        if: always()
+        run: |
+          if [ -f .local/dev.pid ]; then kill "$(cat .local/dev.pid)" || true; fi
