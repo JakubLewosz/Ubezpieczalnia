@@ -22,7 +22,9 @@ Fixtures `application_text`, `application_scan`, `application_mixed`, PNG/JPEG i
 
 ## Playwright
 
-Uruchom aplikację przez `scripts/dev.py` albo Compose. W terminalu testów ustaw użytkownika i hasło wcześniej jawnie utworzonego konta. Na POSIX hasło wczytaj bez wpisywania go do historii:
+Pełny zestaw wymaga dwóch kont EMPLOYEE (`E2E_USERNAME/PASSWORD` i `E2E_SECOND_USERNAME/PASSWORD`) oraz konta ADMIN (`E2E_ADMIN_USERNAME/PASSWORD`), wcześniej jawnie utworzonych na danych testowych. Dla poczty wybierz `E2E_MAIL_SOURCE=imap` i lokalny Dovecot opisany niżej; wariant `demo` służy osobnemu sprawdzaniu interfejsu bez sieci IMAP. Brak wyboru źródła kończy test błędem. Uruchom aplikację przez `scripts/local_imap.py run-dev` albo Compose z jawnym nakładanym plikiem `compose.local-imap.yaml`.
+
+Na POSIX każde hasło wczytaj bez wpisywania go do historii; przykład dla pierwszego konta:
 
 ```sh
 export E2E_BASE_URL=http://127.0.0.1:5173
@@ -48,7 +50,27 @@ npm run test:e2e
 Remove-Item Env:E2E_PASSWORD
 ```
 
-Przebieg: logowanie → klient → upload → zakończenie rzeczywistego zadania → korekta → zapis → zatwierdzenie → pobranie XLSX. E2E wymaga worker/Redis, a nie tylko serwera Vite. Konto i wytworzone dane testowe pozostają w lokalnej bazie. Raporty/przechwycone pobrania nie trafiają do Git.
+Przed `npm run test:e2e` uzupełnij analogicznie drugie konto, ADMIN i źródło. Zestaw obejmuje 5 przebiegów dokumentowych oraz 4 pocztowe: import przez worker, indywidualne odczytanie dwóch osób, pracę odpowiedzialnego, konflikt równoczesnego przejęcia, zachowanie notatki przy zmianie właściciela, bezpieczny HTML i załącznik → dokument → OCR → rewizję/XLSX. Test poczty najpierw utrwala granicę startową lokalnego źródła, następnie dopisuje fixture na lokalnym serwerze. Nie resetuje kursora istniejącego źródła. E2E wymaga workerów/Redis. Konta i dane testowe pozostają w lokalnej bazie. Raporty/przechwycone pobrania nie trafiają do Git.
+
+## Lokalny IMAP i rozdzielenie kolejek
+
+Szczegóły instalacji, TLS, ograniczeń i licencji obrazu: [LOCAL_IMAP.md](LOCAL_IMAP.md). Poniższe polecenia dotyczą wyłącznie serwera testowego z `compose.imap-test.yaml`, opublikowanego na `127.0.0.1:19993`:
+
+```sh
+python3 scripts/local_imap.py init
+python3 scripts/local_imap.py start
+uv run --project backend python scripts/check_imap_protocol.py --fixture fixtures/mail/application.eml
+RUN_LOCAL_IMAP_TESTS=1 uv run --project backend pytest backend/tests/test_mail_sync_integration.py
+uv run --project backend python scripts/local_imap.py run-dev
+```
+
+`init` generuje losowe hasło i certyfikat w ignorowanym `.local/imap-test` z prawami `0600`; nie zastępuje istniejącej konfiguracji. Test protokołu sprawdza rzeczywiste TLS, IMAP4rev1, odrzucenie niezaufanego certyfikatu, dwa różne UID o tej samej treści oraz identyczne UID/SHA-256/flagi przed i po pracy produkcyjnego klienta. Test integracyjny zapisuje przez produkcyjny synchronizator do PostgreSQL i porównuje stan odczytania; wymaga jawnego opt-in. Zwykły zestaw backendu pomija wyłącznie ten test sieciowy, a CI uruchamia go obowiązkowo osobnym krokiem po starcie Dovecot.
+
+OCR konsumuje `ocr,celery` (druga kolejka zachowuje zgodność z dawnymi zadaniami), osobny worker konsumuje `mail,maintenance`. Beat cyklicznie zleca import i odzyskiwanie zadań. Co 60 sekund uruchamia również ograniczone sprzątanie dziennika osieroconych plików; nie skanuje całego magazynu. Niepoprawna konfiguracja poczty pokazuje błąd integracji, zachowując działanie pozostałej aplikacji.
+
+Powtarzalny test bez otwartej przeglądarki: `uv run --project backend python scripts/verify_mail_worker.py` przy uruchomionym lokalnym IMAP i native workerach. Wymaga prywatnego pliku danych logowania wskazanego przez `--credentials` (domyślnie `.local/demo-credentials.json`). Dodaje tylko syntetycznego klienta, 30-stronicowy dokument oraz newsletter, a następnie sprawdza, że wiadomość zostaje pobrana przez beat/mail worker podczas rzeczywistego OCR, pozostaje `todo`, bez właściciela i bez osobistego odczytania. 5 września 2026 wiadomość zaimportowała się po **4,08 s**, gdy OCR wciąż działał; OCR zakończył się po **25,01 s** kontrolowanym błędem przekroczenia 30 pozycji zakresu w sztucznie powielonym dokumencie. Ta próba potwierdza niezależne kolejki, bez pozornego sukcesu ekstrakcji.
+
+Czysty, osobny Compose: `python3 scripts/verify_compose.py --port 5175 --local-imap`. Skrypt losuje nazwę projektu, prywatną konfigurację oraz trzy konta i zachowuje niezależne wolumeny. Nie zatrzymuje ani nie usuwa istniejącej demonstracji. Domyślna konfiguracja Compose bez tego przełącznika pozostawia pocztę wyłączoną.
 
 ## Ręczny odbiór
 
@@ -71,7 +93,7 @@ Powtarzalna natywna próba kopii/odtworzenia, po zatrzymaniu aplikacji i worker/
 
 ## CI
 
-Workflow `.github/workflows/ci.yml` przygotowuje PostgreSQL, Redis i Tesseract `pol+eng`, uruchamia testy backendu, kontrolę migracji, lint, TypeScript, testy komponentów i build, a następnie prawdziwy przebieg przeglądarkowy z Celery. Hasło E2E i klucz sesji są losowane podczas joba. Zewnętrzne OCR/AI i produkcyjne sekrety nie są wymagane. Job nie zastępuje weryfikacji Docker Compose na komputerze z działającym demonem.
+Workflow `.github/workflows/ci.yml` przygotowuje PostgreSQL, Redis, Tesseract `pol+eng` i lokalny Dovecot z TLS, uruchamia testy backendu, kontrolę migracji, lint, TypeScript, komponenty/build oraz 9 scenariuszy Playwright z prawdziwymi workerami. Oddzielny job buduje i uruchamia czyste Compose. Tesseract `pol+eng` jest wymagany i jego brak przerywa CI. Losowe hasła kont E2E, lokalnego IMAP, bazy Compose i klucz sesji otrzymują `add-mask` przed zapisem do pliku lub `GITHUB_ENV`. Artefakt błędu zawiera wyłącznie liczniki i identyfikatory testów z allowlisty; brak w nim logów, sesji, treści żądań i trace. Zewnętrzne OCR/AI i produkcyjne sekrety nie są wymagane.
 
 ## Rzeczywiste przerwanie workera
 
@@ -84,3 +106,14 @@ Lokalny Tesseract 5.5.3 `pol+eng`, syntetyczny font DejaVu Sans i rendering PDF 
 Parser nie zamienia samodzielnie `O` na `0` ani `t` na `ł`. Każde pole OCR otrzymuje ostrzeżenie i odnośnik do strony; pracownik musi porównać źródło oraz poprawić dane. Poprawne oczekiwania pozostają w `fixtures/synthetic/expected.json` oddzielnie od jawnych `accepted_ocr_readings`. Testy dopuszczają tylko te opisane różnice i wymagają ostrzeżenia przy odstępstwie; nie deklarują pełnej dokładności odczytu. Inna wersja Tesseract może wymagać osobnej oceny zaobserwowanego wyniku, bez zmieniania prawidłowej wartości referencyjnej ani dodawania zgadywanych poprawek do parsera.
 
 Limity silnika: tekst całego dokumentu do 1 MiB UTF-8, do 100 uczestników i 30 pozycji żądanego zakresu. Ich przekroczenie kończy zadanie czytelnym błędem. Kwoty profilu mają maksymalnie 12 cyfr przed przecinkiem i 2 po nim; są eksportowane jako liczby, bez utraty identyfikatorów tekstowych z zerami wiodącymi.
+
+## Odbiór naprawy i poczty — 2026-09-05
+
+- Końcowy backend natywny: `OCR_REQUIRED=1 uv run --project backend pytest backend/tests` — 188 passed, 1 skipped /25,22 s; jeden opt-in IMAP wykonany oddzielnie z Dovecot: 1 passed /1,50 s. To nie pominięcie obowiązkowego OCR.
+- 32 komponenty, TS, lint, Prettier i build PASS. Końcowy Compose B, 9 scenariuszy Playwright z prawdziwym API/PostgreSQL/Redis/workerami/Dovecot: 9 passed /1,8 min.
+- Trwały journal: rzeczywisty SIGKILL po zapisie bajtów przed commitem, selektywne usunięcie własnego osieroconego pliku; referencje i aktywne blokady/dzierżawy chronione.
+- Rozdzielenie kolejek przy zamkniętej przeglądarce: OCR 25,01 s, nowy mail ready/todo po 4,08 s podczas running OCR; brak osobistego odczytu.
+- Backup/restore: 25 tabel, 67 oryginałów, 7 rewizji, 170 plików oraz pełne snapshoty 29 wiadomości, 8 załączników, 7 odczytów i 3 źródeł. Import kopii wyłączony przed API, źródło bez zmian. Następny restart aplikacji zachował dane pracy, odczyty, cursor i rewizje.
+- Zrzuty i sprawdzenie 1440/390 px, focus/Enter/Space/Escape, brak zewnętrznych żądań z HTML: SCREENSHOTS. Wyniki zdalne i środowiskowe odchylenia OCR: STATUS.
+
+Nie uruchamiaj kilku testów wstrzykujących wiadomości do tego samego Dovecot równocześnie: test niezmienności globalnego zbioru UID wymaga kontrolowanego, niezmienianego przez inny test źródła. Dane z wcześniejszych biegów nie są usuwane.

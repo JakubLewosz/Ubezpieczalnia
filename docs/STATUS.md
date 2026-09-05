@@ -1,6 +1,6 @@
 # Stan Broker Office — naprawa i wspólna skrzynka, 2026-09-05
 
-Rozwinięto istniejące MVP od commita `b9460085db68688c2c38b2c896cb5106ee6cadbd` na `codex/broker-office-mailbox`. Naprawa dokumentów jest osobnym commitem `2c1ec08`. Historyczne wyniki pierwszego MVP zachowano w [HISTORICAL_STATUS_b946008](HISTORICAL_STATUS_b946008.md); nie są wynikami obecnego odbioru.
+Rozwinięto istniejące MVP od commita `b9460085db68688c2c38b2c896cb5106ee6cadbd` na `codex/broker-office-mailbox`. Naprawa dokumentów jest osobnym commitem `2c1ec08`, poczta `9ec7d60`, zachowanie bajtów .eml przy klonowaniu `4d495f1`. Gałąź została wypchnięta do GitHub. Historyczne wyniki pierwszego MVP zachowano w [HISTORICAL_STATUS_b946008](HISTORICAL_STATUS_b946008.md); nie są wynikami obecnego odbioru.
 
 ## Etap A
 
@@ -23,7 +23,13 @@ MIME ma tekstowy widok, limity, prywatne pliki i powody blokady części. IMAP u
 - Pełny Playwright poczty na Dovecot + Redis/Celery: **2 passed /48,1 s**. Inject → worker → todo → osobiste otwarcie → przejęcie → drugi pracownik → klient 26 z dalszej strony → PDF/OCR/weryfikacja/rzeczywiste komórki XLSX → done → kolejna odpowiedź nowe todo. Newsletter no_action wymaga powodu.
 - Przy zamkniętej przeglądarce 30-stronicowy OCR trwał 25,01 s, a beat/mailworker pobrał nowy mail po 4,08 s podczas statusu running OCR. Mail pozostał todo bez właściciela i odczytów. Sam wielokrotnie powielony dokument OCR zakończył się oczekiwanym błędem limitu pozycji zakresu; nie oznaczamy go jako udanej ekstrakcji.
 
-Końcowe zbiorcze testy po dzienniku plików, dodatkowe konflikty/HTML/układ, świeży Compose B, rozszerzony backup/restore oraz zdalne CI są jeszcze w trakcie odbioru. Wyniki zostaną dopisane po rzeczywistym wykonaniu.
+Końcowy zbiorczy backend na macOS: **188 passed, 1 skipped /25,22 s**. Pominięty jest wyłącznie test jawnie wymagający serwera IMAP, wykonany oddzielnie na najnowszym kodzie: **1 passed /1,50 s** z prawdziwym Dovecot/TLS i dziennikiem plików. OCR był obowiązkowy (`OCR_REQUIRED=1`). Ruff i kontrola migracji przechodzą. Frontend: **32/32 komponenty**, strict TypeScript, ESLint, Prettier i build PASS.
+
+Świeży Compose B `broker-check-57090f14bf` na 5175: build, migrate, brak oczekujących migracji i 7 działających usług. **9/9 Playwright /1,8 min** na końcowym backendzie (w tym konflikty, HTML bez zewnętrznych żądań i klawiatura przy 390 px). Pierwsza próba testu focus trafiła na chwilowo disabled przycisk podczas pobierania właściciela; test czeka teraz na aktywny przycisk i sprawdza focus. Wszystkie scenariusze ponowiono. Cztery nowe zrzuty syntetyczne w SCREENSHOTS; 390 px bez poziomego przewijania.
+
+Rozszerzony backup/restore i restart źródła **PASS**: 25 tabel, 67 oryginałów, 7 zatwierdzonych rewizji, 170 plików, 29 maili, 8 załączników, 7 osobistych odczytów i 3 źródła. Hash pełnych tabel poczty porównano przed wstrzymaniem importera WYŁĄCZNIE w odtworzonej bazie. Anonimowe pobrania zwróciły 403, uwierzytelnione raw mail/załącznik/original/PNG/historyczny XLSX były zgodne. Po wznowieniu źródła zachowane są statusy, odczyty, źródłowe pliki, cursor/enabled/version i rewizje. Odtwarzano do nowej własnej bazy, nie nadpisywano źródła.
+
+GitHub Actions na 4d495f1: Compose job SUCCESS; integration ujawnił jeden odmienny odczyt OCR na Ubuntu/Tesseract (`DEMOOO1` zamiast macOS `DEMOO001`). Poprawny wzorzec pozostaje `DEMO001`; uzupełniono wyłącznie jawnie zaobserwowany wariant, z niezmienionymi wymaganiami źródła i ostrzeżeń. Końcowy workflow po tej korekcie będzie odnotowany oddzielnie.
 
 ## Ograniczenia
 

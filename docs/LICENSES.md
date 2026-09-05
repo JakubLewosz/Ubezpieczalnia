@@ -51,3 +51,7 @@ Django 5.2 obsługuje Python 3.12, a PostgreSQL 17 mieści się w wymaganiach ba
 Dowodem instalowalności są istniejące zamrożone środowiska i wykonane testy opisane w STATUS. Różnica Redis lokalnie/Compose oraz brak testu uruchomienia kontenerów nie są przemilczane. Aktualizacja któregokolwiek lockfile lub obrazu wymaga ponowienia istotnych testów i odświeżenia tego zestawienia.
 
 TypeScript przypięto do stabilnego 6.0.3, ponieważ aktualny typescript-eslint 8.69.0 deklaruje zgodność `>=4.8.4 <6.1.0`. Początkowo instalowalne 7.0.2 nie pasowało do tego zakresu; wybrano zgodny komplet z działającym lintem, bez obchodzenia zależności peer.
+
+## Zmiany naprawy i poczty
+
+Naprawa lockfile npm dodaje brakujące wpisy transytywne @emnapi/core i @emnapi/runtime 1.11.1 (MIT) bez aktualizacji dotychczasowych wersji. Python nie otrzymał nowych zależności: IMAP/MIME używają stdlib, dziennik istniejącego psycopg. Lokalny test używa Dovecot CE 2.4.5; licencje i wyjątki obrazu opisano wraz z oficjalnymi źródłami w LOCAL_IMAP.md. Dovecot nie jest wymagany do późniejszego odbioru od dostawcy.

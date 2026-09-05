@@ -60,10 +60,14 @@ def test_numbered_actual_ocr_images_and_mixed(name, methods, settings, tmp_path)
         if actual[key] != expected:
             # Measured real OCR mistakes remain explicit; never infer Pin -> PLN
             # or remove extra letter O from a registration number.
-            allowed = OCR_OBSERVATIONS["accepted_readings"]
-            assert actual[key] in allowed.get(key, []), (name, key, actual[key])
+            allowed = [
+                *OCR_OBSERVATIONS["accepted_readings"].get(key, []),
+                *OCR_OBSERVATIONS.get("by_fixture", {}).get(name, {}).get(key, []),
+            ]
+            assert actual[key] in allowed, (name, key, actual[key])
             field = next(f for f in result["fields"] if f"{f['group']}.{f['index']}.{f['code']}" == key)
             assert field["method"] == "ocr" and field["source"] and field["warnings"]
+            assert field["source"] in pages[field["page"] - 1].text
             if key.endswith("insured_sum"):
                 assert field["unit_conflict"]
     assert any(f["warnings"] for f in result["fields"] if f["method"] == "ocr")

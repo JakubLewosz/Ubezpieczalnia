@@ -146,12 +146,17 @@ def database_snapshot(connection, media):
     ))
     revision_digest = hashlib.sha256(json.dumps(revisions, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     mail_hashes = {}
+    mailboxes = []
     for table in tables:
         if table.startswith("correspondence_"):
             rows = [row[0] for row in connection.execute(
                 sql.SQL("SELECT to_jsonb(t) FROM {} AS t ORDER BY id").format(sql.Identifier("public", table))
             )]
             mail_hashes[table] = hashlib.sha256(json.dumps(rows, sort_keys=True).encode()).hexdigest()
+            if table == "correspondence_mailbox":
+                mailboxes = [{key: row[key] for key in (
+                    "id", "enabled", "uidvalidity", "boundary_uid", "discovered_uid", "version"
+                )} for row in rows]
     for table, file_column, checksum_column in (
         ("correspondence_message", "raw_file", "raw_sha256"),
         ("correspondence_attachment", "file", "checksum"),
@@ -167,7 +172,8 @@ def database_snapshot(connection, media):
             if not path.is_relative_to(media.resolve()) or not path.is_file() or digest_file(path) != checksum:
                 raise RuntimeError("Plik poczty nie istnieje w magazynie lub ma nieprawidłową sumę kontrolną.")
     return {"table_counts": counts, "originals": originals, "revision_count": len(revisions),
-            "revision_fields_sha256": revision_digest, "mail_table_sha256": mail_hashes}
+            "revision_fields_sha256": revision_digest, "mail_table_sha256": mail_hashes,
+            "mailbox_cursors": mailboxes}
 
 
 def checked_process(command, environment, error_file, output=None):

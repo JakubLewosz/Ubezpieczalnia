@@ -60,4 +60,8 @@ Wartości generowanych sekretów CI są rejestrowane przez `::add-mask::` **prze
 
 Przy niepowodzeniu CI publikuje tylko `test-summary.json` z licznikami i identyfikatorami nieudanych testów. `collect_ci_diagnostics.py` korzysta z zamkniętej listy pól: nie kopiuje komunikatów wyjątków, logów, zawartości żądań, załączników, `.env`, sesji ani archiwów Playwright trace. Sprawdzono próbą z kontrolnym sekretem w błędzie i ścieżką sesji, że nie trafiają do wynikowego JSON. Pełne ślady przeglądarki mogą zawierać ciasteczka i pozostają wyłącznie lokalną diagnostyką poza Git, bez uploadu jako artefakt.
 
-Zmodyfikowany workflow wymaga jeszcze wykonania na GitHub po publikacji nowego commita. Lokalny sukces nie jest zielonym GitHub Actions.
+Gałąź codex/broker-office-mailbox opublikowano. Zdalne joby Compose przeszły; pierwszy integration ujawnił odmienną pomyłkę OCR na Ubuntu, opisaną w STATUS. Wynik końcowego workflow po korekcie rejestru obserwacji jest raportowany tam oddzielnie. Lokalnego sukcesu nie utożsamiamy z GitHub Actions.
+
+## Końcowy Compose B
+
+Projekt `broker-check-57090f14bf` na 5175 utworzono na świeżych osobnych wolumenach. Końcowe obrazy obejmowały dziennik plików/migrację correspondence0002, poprawne CRLF i licznik ręcznych szkiców. Build, migrate, makemigrations --check i 7 usług przeszły; cały zestaw **9/9 Playwright /1,8 min** z rzeczywistym lokalnym Dovecot/TLS i workerami również przeszedł. Natywne oraz kontenerowe magazyny pozostały odrębne.

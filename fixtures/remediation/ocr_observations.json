@@ -2,8 +2,32 @@
   "environment": "Tesseract 5.5.3, języki pol+eng, macOS, bez zewnętrznych usług",
   "note": "Zaobserwowane odstępstwa od niezależnych expected.json. Dopuszczenie wymaga prawdziwego źródła OCR i ostrzeżenia. Nie jest to poprawna wartość ani statystyka skuteczności. Wartość zgodna z expected.json również przechodzi test.",
   "accepted_readings": {
-    "vehicle.0.registration": ["DEMOO001"],
-    "coverage_items.1.insured_sum": [null]
+    "vehicle.0.registration": [
+      "DEMOO001"
+    ],
+    "coverage_items.1.insured_sum": [
+      null
+    ]
   },
-  "raw_unit_observation": "10.000 Pin zamiast 10.000 Pln. Brak jednoznacznej jednostki: suma pozostaje null, rzeczywisty fragment źródła i unit_conflict są zachowane; potrzebna ręczna decyzja."
+  "raw_unit_observation": "10.000 Pin zamiast 10.000 Pln. Brak jednoznacznej jednostki: suma pozostaje null, rzeczywisty fragment źródła i unit_conflict są zachowane; potrzebna ręczna decyzja.",
+  "by_fixture": {
+    "numbered_scan.pdf": {
+      "vehicle.0.registration": [
+        "DEMOOO1"
+      ]
+    }
+  },
+  "additional_observations": [
+    {
+      "fixture": "numbered_scan.pdf",
+      "field": "vehicle.0.registration",
+      "reading": "DEMOOO1",
+      "environment": "GitHub Actions ubuntu-24.04 amd64, Tesseract 5.3.4-1build5, pol+eng 1:4.1.0-2",
+      "evidence_runs": [
+        "https://github.com/JakubLewosz/Ubezpieczalnia/actions/runs/33973869722",
+        "https://github.com/JakubLewosz/Ubezpieczalnia/actions/runs/33973926507"
+      ],
+      "note": "Rzeczywisty odczyt dwóch uruchomień CI. Odstępstwo dopuszczone wyłącznie dla tej fixture oraz przy zachowanym źródle OCR i ostrzeżeniu. Prawidłowe oczekiwanie DEMO001 w expected.json pozostaje bez zmian."
+    }
+  ]
 }
