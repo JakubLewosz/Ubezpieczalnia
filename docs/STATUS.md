@@ -29,7 +29,9 @@ Końcowy zbiorczy backend na macOS: **188 passed, 1 skipped /25,22 s**. Pominię
 
 Rozszerzony backup/restore i restart źródła **PASS**: 25 tabel, 67 oryginałów, 7 zatwierdzonych rewizji, 170 plików, 29 maili, 8 załączników, 7 osobistych odczytów i 3 źródła. Hash pełnych tabel poczty porównano przed wstrzymaniem importera WYŁĄCZNIE w odtworzonej bazie. Anonimowe pobrania zwróciły 403, uwierzytelnione raw mail/załącznik/original/PNG/historyczny XLSX były zgodne. Po wznowieniu źródła zachowane są statusy, odczyty, źródłowe pliki, cursor/enabled/version i rewizje. Odtwarzano do nowej własnej bazy, nie nadpisywano źródła.
 
-GitHub Actions na 4d495f1: Compose job SUCCESS; integration ujawnił jeden odmienny odczyt OCR na Ubuntu/Tesseract (`DEMOOO1` zamiast macOS `DEMOO001`). Poprawny wzorzec pozostaje `DEMO001`; uzupełniono wyłącznie jawnie zaobserwowany wariant, z niezmienionymi wymaganiami źródła i ostrzeżeń. Końcowy workflow po tej korekcie będzie odnotowany oddzielnie.
+GitHub Actions na 4d495f1: Compose job SUCCESS; integration ujawnił jeden odmienny odczyt OCR na Ubuntu/Tesseract (`DEMOOO1` zamiast macOS `DEMOO001`). Poprawny wzorzec pozostaje `DEMO001`; uzupełniono wyłącznie jawnie zaobserwowany wariant, z niezmienionymi wymaganiami źródła i ostrzeżeń.
+
+**Końcowy zdalny [workflow 33974462417](https://github.com/JakubLewosz/Ubezpieczalnia/actions/runs/33974462417) dla `fffa3c7784bc861489611bdab538a13a7a4d2e32`: SUCCESS, oba joby `integration` i `compose`.** Wynik odczytano przez API GitHub po zakończeniu. Ubuntu 24.04 AMD64: backend **188 passed, 1 skipped /47,65 s**, następnie obowiązkowy rzeczywisty IMAP **1 passed /1,57 s**, frontend **32 testy** i pełny Playwright **9 passed /2,1 min**. Przeszły zamrożone instalacje, wymagany OCR, kontrola migracji, Ruff, TypeScript, ESLint i build. Osobny job wykonał świeży build/start Compose z własnymi wolumenami. Pominięty w głównym pytest test IMAP został wykonany osobnym krokiem; upload diagnostyki przeznaczony wyłącznie dla błędu pozostał prawidłowo pominięty. Ten wynik dotyczy wskazanego commita kodu; późniejsze uzupełnienie raportu nie zmienia implementacji.
 
 ## Ograniczenia
 

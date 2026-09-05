@@ -93,6 +93,8 @@ Powtarzalna natywna próba kopii/odtworzenia, po zatrzymaniu aplikacji i worker/
 
 ## CI
 
+Wykonany zdalny [workflow 33974462417](https://github.com/JakubLewosz/Ubezpieczalnia/actions/runs/33974462417), commit `fffa3c7784bc861489611bdab538a13a7a4d2e32`, Ubuntu 24.04 AMD64: oba joby **SUCCESS**. Backend **188 passed, 1 skipped /47,65 s**; odrębny obowiązkowy rzeczywisty IMAP **1 passed /1,57 s**; frontend **32 testy**, Playwright **9 passed /2,1 min**. Przeszły też kontrole instalacji/migracji/lintu/build oraz świeży Compose. To wynik wykonania odczytany przez API GitHub, nie wniosek z samej definicji workflow.
+
 Workflow `.github/workflows/ci.yml` przygotowuje PostgreSQL, Redis, Tesseract `pol+eng` i lokalny Dovecot z TLS, uruchamia testy backendu, kontrolę migracji, lint, TypeScript, komponenty/build oraz 9 scenariuszy Playwright z prawdziwymi workerami. Oddzielny job buduje i uruchamia czyste Compose. Tesseract `pol+eng` jest wymagany i jego brak przerywa CI. Losowe hasła kont E2E, lokalnego IMAP, bazy Compose i klucz sesji otrzymują `add-mask` przed zapisem do pliku lub `GITHUB_ENV`. Artefakt błędu zawiera wyłącznie liczniki i identyfikatory testów z allowlisty; brak w nim logów, sesji, treści żądań i trace. Zewnętrzne OCR/AI i produkcyjne sekrety nie są wymagane.
 
 ## Rzeczywiste przerwanie workera
